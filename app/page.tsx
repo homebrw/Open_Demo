@@ -148,7 +148,7 @@ export default function Home() {
               <h2 className="text-base font-semibold text-gray-800 mb-3">
                 Complétion la plus probable
               </h2>
-              <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 font-mono text-sm leading-relaxed">
+              <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 font-mono text-sm leading-relaxed whitespace-pre-wrap">
                 <span className="text-gray-600">{usedPhrase}</span>
                 <span className="text-[#378ADD] font-semibold">{greedy.added}</span>
               </div>
