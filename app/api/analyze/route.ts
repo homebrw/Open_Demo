@@ -17,23 +17,19 @@ export interface TreeNode {
 }
 
 async function getTopLogprobs(phrase: string): Promise<TokenInfo[]> {
-  const response = await getOpenAIClient().chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [
-      { role: 'system', content: 'Continue le texte naturellement avec le prochain token seulement.' },
-      { role: 'user', content: phrase },
-    ],
+  // Legacy completions API (gpt-3.5-turbo-instruct) gives true text-continuation
+  // logprobs, unlike chat completions which generates conversational responses.
+  const response = await getOpenAIClient().completions.create({
+    model: 'gpt-3.5-turbo-instruct',
+    prompt: phrase,
     max_tokens: 1,
-    logprobs: true,
-    top_logprobs: 10,
+    logprobs: 5,
   });
 
-  const logprobContent = response.choices[0]?.logprobs?.content?.[0]?.top_logprobs ?? [];
-  return logprobContent.map((lp) => ({
-    token: lp.token,
-    prob: Math.exp(lp.logprob),
-    logprob: lp.logprob,
-  }));
+  const topLogprobs = response.choices[0]?.logprobs?.top_logprobs?.[0] ?? {};
+  return Object.entries(topLogprobs)
+    .map(([token, logprob]) => ({ token, prob: Math.exp(logprob), logprob }))
+    .sort((a, b) => b.prob - a.prob);
 }
 
 async function buildTree(

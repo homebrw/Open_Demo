@@ -53,7 +53,7 @@ export default function Home() {
             🧠 Explorateur de Logits OpenAI
           </h1>
           <p className="text-gray-500 text-sm">
-            Visualisez l&apos;arbre de probabilités des tokens générés par GPT-4o-mini
+            Visualisez l&apos;arbre de probabilités des tokens générés par gpt-3.5-turbo-instruct
           </p>
         </header>
 
