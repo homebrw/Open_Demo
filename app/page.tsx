@@ -16,11 +16,22 @@ interface AnalysisResult {
   tree: TreeNode[];
 }
 
+function getGreedyCompletion(roots: TreeNode[], initialPhrase: string) {
+  if (roots.length === 0) return null;
+  let node = roots[0];
+  while (node.children.length > 0) node = node.children[0];
+  return { full: node.phrase, added: node.phrase.slice(initialPhrase.length) };
+}
+
+const DEPTH_OPTIONS = [2, 3, 4, 5];
+
 export default function Home() {
   const [phrase, setPhrase] = useState('');
+  const [depth, setDepth] = useState(4);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [usedPhrase, setUsedPhrase] = useState('');
 
   async function handleAnalyze() {
     if (!phrase.trim()) return;
@@ -32,18 +43,21 @@ export default function Home() {
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phrase: phrase.trim() }),
+        body: JSON.stringify({ phrase: phrase.trim(), depth }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Erreur serveur');
       setResult(data);
+      setUsedPhrase(phrase.trim());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
       setLoading(false);
     }
   }
+
+  const greedy = result ? getGreedyCompletion(result.tree, usedPhrase) : null;
 
   return (
     <main className="min-h-screen bg-gray-50">
@@ -71,26 +85,53 @@ export default function Home() {
               if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleAnalyze();
             }}
           />
-          <div className="flex items-center justify-between mt-3">
-            <span className="text-xs text-gray-400">Ctrl+Enter pour analyser</span>
-            <button
-              onClick={handleAnalyze}
-              disabled={loading || !phrase.trim()}
-              className="px-6 py-2 rounded-lg text-white text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ backgroundColor: '#378ADD' }}
-            >
-              {loading ? (
-                <span className="flex items-center gap-2">
-                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                  </svg>
-                  Construction de l&apos;arbre…
-                </span>
-              ) : (
-                'Analyser'
-              )}
-            </button>
+
+          <div className="flex items-center justify-between mt-4">
+            {/* Depth selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 font-medium">Profondeur :</span>
+              <div className="flex gap-1">
+                {DEPTH_OPTIONS.map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setDepth(d)}
+                    className="w-8 h-8 rounded-lg text-xs font-semibold transition-all border"
+                    style={{
+                      backgroundColor: depth === d ? '#378ADD' : 'white',
+                      color: depth === d ? 'white' : '#6b7280',
+                      borderColor: depth === d ? '#378ADD' : '#e5e7eb',
+                    }}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+              <span className="text-xs text-gray-400">
+                → {Math.pow(3, depth)} feuilles, {(Math.pow(3, depth) - 1) / 2 + 1} appels API
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-400">Ctrl+Enter</span>
+              <button
+                onClick={handleAnalyze}
+                disabled={loading || !phrase.trim()}
+                className="px-6 py-2 rounded-lg text-white text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: '#378ADD' }}
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                    </svg>
+                    Construction…
+                  </span>
+                ) : (
+                  'Analyser'
+                )}
+              </button>
+            </div>
           </div>
         </section>
 
@@ -100,8 +141,20 @@ export default function Home() {
           </div>
         )}
 
-        {result && (
+        {result && greedy && (
           <div className="space-y-6">
+            {/* Greedy completion */}
+            <section className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+              <h2 className="text-base font-semibold text-gray-800 mb-3">
+                Complétion la plus probable
+              </h2>
+              <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 font-mono text-sm leading-relaxed">
+                <span className="text-gray-600">{usedPhrase}</span>
+                <span className="text-[#378ADD] font-semibold">{greedy.added}</span>
+              </div>
+            </section>
+
+            {/* Top tokens table */}
             <section className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
               <h2 className="text-base font-semibold text-gray-800 mb-4">
                 Top tokens — premier niveau
@@ -109,14 +162,15 @@ export default function Home() {
               <TokenTable tokens={result.topTokens} />
             </section>
 
+            {/* Probability tree */}
             <section className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
               <h2 className="text-base font-semibold text-gray-800 mb-1">
-                Arbre de probabilités (profondeur 3 × 3 branches)
+                Arbre de probabilités (profondeur {depth} × 3 branches)
               </h2>
               <p className="text-xs text-gray-400 mb-5">
                 Chemin glouton en bleu · hover sur un token pour voir la phrase complète et la probabilité cumulée · scroll horizontal disponible
               </p>
-              <ProbabilityTree roots={result.tree} initialPhrase={phrase.trim()} />
+              <ProbabilityTree roots={result.tree} initialPhrase={usedPhrase} />
             </section>
           </div>
         )}

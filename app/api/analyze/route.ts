@@ -66,10 +66,12 @@ export async function POST(request: Request) {
       return Response.json({ error: 'Le champ "phrase" est requis.' }, { status: 400 });
     }
 
+    const depth: number = Math.min(Math.max(Number(body?.depth) || 4, 1), 5);
+
     // Single root call — reused for both the table and tree root level
     const allRootTokens = await getTopLogprobs(phrase);
 
-    // Build the tree: top 3 root tokens expanded 2 more levels in parallel
+    // Build the tree: top 3 root tokens expanded (depth-1) more levels in parallel
     const tree = await Promise.all(
       allRootTokens.slice(0, 3).map(async (t) => {
         const childPhrase = phrase + t.token;
@@ -79,7 +81,7 @@ export async function POST(request: Request) {
           prob: t.prob,
           cumulative: childCumulative,
           phrase: childPhrase,
-          children: await buildTree(childPhrase, 2, childCumulative, 3),
+          children: await buildTree(childPhrase, depth - 1, childCumulative, 3),
         };
       })
     );
