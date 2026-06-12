@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import TokenTable from './components/TokenTable';
 import ProbabilityTree from './components/ProbabilityTree';
 import type { TreeNode } from './components/ProbabilityTree';
@@ -67,16 +66,9 @@ export default function Home() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             🧠 Explorateur de Logits OpenAI
           </h1>
-          <p className="text-gray-500 text-sm mb-3">
+          <p className="text-gray-500 text-sm">
             Visualisez l&apos;arbre de probabilités des tokens générés par gpt-3.5-turbo-instruct
           </p>
-          <Link
-            href="/playground"
-            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition"
-            style={{ borderColor: '#378ADD', color: '#378ADD' }}
-          >
-            🎛️ Playground de paramètres
-          </Link>
         </header>
 
         <section className="bg-white rounded-xl border border-gray-200 p-6 mb-6 shadow-sm">

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import Link from 'next/link';
 
 const MODEL = 'gpt-4.1-mini';
 
@@ -179,14 +178,6 @@ export default function PlaygroundPage() {
       <div className="max-w-[1200px] mx-auto px-4 py-10">
         {/* Header */}
         <header className="mb-8">
-          <div className="flex items-center gap-3 mb-1">
-            <Link
-              href="/"
-              className="text-xs text-gray-400 hover:text-gray-600 transition"
-            >
-              ← Explorateur de Logits
-            </Link>
-          </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             🎛️ Playground de paramètres
           </h1>
