@@ -18,7 +18,6 @@ export async function POST(request: Request) {
     const temperature: number = Math.min(Math.max(Number(body?.temperature ?? 0.7), 0), 2);
     const top_p: number = Math.min(Math.max(Number(body?.top_p ?? 1.0), 0), 1);
     const max_output_tokens: number = Math.min(Math.max(Number(body?.max_output_tokens ?? 300), 1), 4096);
-    const seed: number | undefined = body?.seed !== undefined && body?.seed !== null && body?.seed !== '' ? Number(body.seed) : undefined;
 
     const start = Date.now();
 
@@ -28,7 +27,6 @@ export async function POST(request: Request) {
       temperature,
       top_p,
       max_output_tokens,
-      ...(seed !== undefined ? { seed } : {}),
     });
 
     const latency = Date.now() - start;

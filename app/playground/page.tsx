@@ -30,7 +30,6 @@ interface Params {
   temperature: number;
   top_p: number;
   max_output_tokens: number;
-  seed: string;
   count: number;
 }
 
@@ -121,7 +120,6 @@ export default function PlaygroundPage() {
     temperature: 0.7,
     top_p: 1.0,
     max_output_tokens: 300,
-    seed: '',
     count: 1,
   });
   const [loading, setLoading] = useState(false);
@@ -138,8 +136,6 @@ export default function PlaygroundPage() {
     setLoading(true);
     setError(null);
 
-    const seed = runParams.seed.trim() !== '' ? parseInt(runParams.seed, 10) : undefined;
-
     try {
       const calls = Array.from({ length: runParams.count }, () =>
         fetch('/api/playground', {
@@ -150,7 +146,6 @@ export default function PlaygroundPage() {
             temperature: runParams.temperature,
             top_p: runParams.top_p,
             max_output_tokens: runParams.max_output_tokens,
-            seed,
           }),
         }).then(async (res) => {
           const data = await res.json();
@@ -258,27 +253,9 @@ export default function PlaygroundPage() {
                 />
               </div>
 
-              {/* Seed */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Seed <span className="text-gray-400 font-normal">(optionnel)</span>
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    value={params.seed}
-                    onChange={(e) => setParam('seed', e.target.value)}
-                    placeholder="Vide = aléatoire"
-                    className="flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#378ADD] focus:border-transparent transition"
-                  />
-                  <button
-                    onClick={() => setParam('seed', String(Math.floor(Math.random() * 1_000_000)))}
-                    className="px-3 py-2 rounded-lg border border-gray-200 text-xs text-gray-500 hover:bg-gray-50 transition whitespace-nowrap"
-                    title="Générer un seed aléatoire"
-                  >
-                    🎲
-                  </button>
-                </div>
+              {/* Seed note */}
+              <div className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-700">
+                <strong>Seed</strong> non supporté par l&apos;API Responses — la reproductibilité n&apos;est pas disponible sur ce modèle.
               </div>
 
               {/* Count */}
@@ -381,7 +358,6 @@ export default function PlaygroundPage() {
                           ['temp', entry.params.temperature.toFixed(1)],
                           ['top_p', entry.params.top_p.toFixed(2)],
                           ['max_tokens', String(entry.params.max_output_tokens)],
-                          ['seed', entry.params.seed || 'aléatoire'],
                         ].map(([k, v]) => (
                           <span
                             key={k}
