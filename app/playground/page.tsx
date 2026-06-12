@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
 
 const MODEL = 'gpt-4.1-mini';
@@ -18,6 +18,13 @@ interface GenerationResult {
   usage: { input_tokens: number; output_tokens: number; total_tokens: number } | null;
   cost: number | null;
   error?: string;
+}
+
+interface HistoryEntry {
+  id: number;
+  prompt: string;
+  params: Params;
+  results: GenerationResult[];
 }
 
 interface Params {
@@ -119,32 +126,31 @@ export default function PlaygroundPage() {
     count: 1,
   });
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<GenerationResult[] | null>(null);
-  const [usedParams, setUsedParams] = useState<Params | null>(null);
+  const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const nextId = useRef(0);
 
   const setParam = useCallback(<K extends keyof Params>(key: K, value: Params[K]) => {
     setParams((p) => ({ ...p, [key]: value }));
   }, []);
 
-  async function handleGenerate() {
-    if (!prompt.trim()) return;
+  async function runGenerate(runPrompt: string, runParams: Params) {
+    if (!runPrompt.trim()) return;
     setLoading(true);
     setError(null);
-    setResults(null);
 
-    const seed = params.seed.trim() !== '' ? parseInt(params.seed, 10) : undefined;
+    const seed = runParams.seed.trim() !== '' ? parseInt(runParams.seed, 10) : undefined;
 
     try {
-      const calls = Array.from({ length: params.count }, () =>
+      const calls = Array.from({ length: runParams.count }, () =>
         fetch('/api/playground', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            prompt: prompt.trim(),
-            temperature: params.temperature,
-            top_p: params.top_p,
-            max_output_tokens: params.max_output_tokens,
+            prompt: runPrompt.trim(),
+            temperature: runParams.temperature,
+            top_p: runParams.top_p,
+            max_output_tokens: runParams.max_output_tokens,
             seed,
           }),
         }).then(async (res) => {
@@ -154,14 +160,18 @@ export default function PlaygroundPage() {
         })
       );
 
-      const all = await Promise.all(calls);
-      setResults(all);
-      setUsedParams({ ...params });
+      const results = await Promise.all(calls);
+      const entry: HistoryEntry = { id: nextId.current++, prompt: runPrompt.trim(), params: { ...runParams }, results };
+      setHistory((h) => [entry, ...h]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
       setLoading(false);
     }
+  }
+
+  function handleGenerate() {
+    runGenerate(prompt, params);
   }
 
   return (
@@ -348,7 +358,7 @@ export default function PlaygroundPage() {
             </section>
           </div>
 
-          {/* Right column: results */}
+          {/* Right column: history */}
           <div className="flex flex-col gap-5">
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
@@ -356,76 +366,78 @@ export default function PlaygroundPage() {
               </div>
             )}
 
-            {results && usedParams && (
-              <>
-                {/* Used params summary */}
+            {loading && (
+              <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm flex items-center gap-3">
+                <svg className="animate-spin h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="#378ADD" strokeWidth="4" />
+                  <path className="opacity-75" fill="#378ADD" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+                <span className="text-sm text-gray-500">Génération en cours…</span>
+              </div>
+            )}
+
+            {history.map((entry) => (
+              <div key={entry.id} className="space-y-3">
+                {/* Entry header: prompt + params + rerun */}
                 <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <div className="flex items-center flex-wrap gap-2">
-                      <span className="text-xs text-gray-500 font-medium">Paramètres utilisés :</span>
-                      {[
-                        ['temp', usedParams.temperature.toFixed(1)],
-                        ['top_p', usedParams.top_p.toFixed(2)],
-                        ['max_tokens', String(usedParams.max_output_tokens)],
-                        ['seed', usedParams.seed || 'aléatoire'],
-                      ].map(([k, v]) => (
-                        <span
-                          key={k}
-                          className="text-xs font-mono px-2 py-0.5 rounded"
-                          style={{ backgroundColor: '#EBF4FF', color: '#378ADD' }}
-                        >
-                          {k}={v}
-                        </span>
-                      ))}
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-gray-500 font-mono truncate mb-2">
+                        &ldquo;{entry.prompt}&rdquo;
+                      </p>
+                      <div className="flex items-center flex-wrap gap-1.5">
+                        {[
+                          ['temp', entry.params.temperature.toFixed(1)],
+                          ['top_p', entry.params.top_p.toFixed(2)],
+                          ['max_tokens', String(entry.params.max_output_tokens)],
+                          ['seed', entry.params.seed || 'aléatoire'],
+                        ].map(([k, v]) => (
+                          <span
+                            key={k}
+                            className="text-xs font-mono px-2 py-0.5 rounded"
+                            style={{ backgroundColor: '#EBF4FF', color: '#378ADD' }}
+                          >
+                            {k}={v}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                     <button
-                      onClick={handleGenerate}
+                      onClick={() => runGenerate(entry.prompt, entry.params)}
                       disabled={loading}
-                      className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition"
+                      className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition shrink-0"
                     >
                       🔄 Relancer
                     </button>
                   </div>
                 </div>
 
-                {/* Result cards grid */}
+                {/* Result cards */}
                 <div
-                  className={`grid gap-4 ${
-                    results.length === 1
+                  className={`grid gap-3 ${
+                    entry.results.length === 1
                       ? 'grid-cols-1'
-                      : results.length === 2
+                      : entry.results.length === 2
                       ? 'grid-cols-1 sm:grid-cols-2'
-                      : results.length === 3
+                      : entry.results.length === 3
                       ? 'grid-cols-1 sm:grid-cols-3'
                       : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-4'
                   }`}
                 >
-                  {results.map((r, i) => (
-                    <ResultCard key={i} index={i} result={r} params={usedParams} />
+                  {entry.results.map((r, i) => (
+                    <ResultCard key={i} index={i} result={r} params={entry.params} />
                   ))}
                 </div>
-              </>
-            )}
+              </div>
+            ))}
 
-            {!results && !loading && (
+            {history.length === 0 && !loading && (
               <div className="flex-1 flex items-center justify-center min-h-[300px]">
                 <p className="text-gray-400 text-sm text-center">
                   Entrez un prompt et cliquez sur <strong>Générer</strong> pour voir les résultats ici.
                   <br />
-                  <span className="text-xs">Lancez plusieurs générations pour observer la variabilité.</span>
+                  <span className="text-xs">Chaque génération s&apos;empile en haut pour faciliter la comparaison.</span>
                 </p>
-              </div>
-            )}
-
-            {loading && (
-              <div className="flex-1 flex items-center justify-center min-h-[300px]">
-                <div className="text-center text-gray-400 text-sm">
-                  <svg className="animate-spin h-6 w-6 mx-auto mb-2" viewBox="0 0 24 24" fill="none">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="#378ADD" strokeWidth="4" />
-                    <path className="opacity-75" fill="#378ADD" d="M4 12a8 8 0 018-8v8H4z" />
-                  </svg>
-                  Génération en cours…
-                </div>
               </div>
             )}
           </div>
