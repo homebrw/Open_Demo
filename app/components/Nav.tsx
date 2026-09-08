@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import VersionToggle from '../version/VersionToggle';
 
 const LINKS = [
   { href: '/', label: '🧠 Explorateur de Logits' },
@@ -30,6 +31,7 @@ export default function Nav() {
             </Link>
           );
         })}
+        <VersionToggle variant="legacy" />
       </div>
     </nav>
   );
