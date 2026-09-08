@@ -1,25 +1,12 @@
 import { getOpenAIClient } from '@/lib/openai';
 import { checkRateLimit, clientIp } from '@/lib/rateLimit';
+import type { TokenInfo, TreeNode } from '@/lib/types';
 
 export const maxDuration = 60;
 
 const MAX_PHRASE_LENGTH = 400;
 const RATE_LIMIT = 30;
 const RATE_WINDOW_MS = 10 * 60 * 1000;
-
-export interface TokenInfo {
-  token: string;
-  prob: number;
-  logprob: number;
-}
-
-export interface TreeNode {
-  token: string;
-  prob: number;
-  cumulative: number;
-  phrase: string;
-  children: TreeNode[];
-}
 
 class Semaphore {
   private queue: (() => void)[] = [];

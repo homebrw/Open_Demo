@@ -3,18 +3,7 @@
 import { useState } from 'react';
 import TokenTable from '../../components/TokenTable';
 import ProbabilityTree from '../../components/ProbabilityTree';
-import type { TreeNode } from '../../components/ProbabilityTree';
-
-interface TokenInfo {
-  token: string;
-  prob: number;
-  logprob: number;
-}
-
-interface AnalysisResult {
-  topTokens: TokenInfo[];
-  tree: TreeNode[];
-}
+import type { AnalysisResult, TreeNode } from '@/lib/types';
 
 function getGreedyCompletion(roots: TreeNode[], initialPhrase: string) {
   if (roots.length === 0) return null;

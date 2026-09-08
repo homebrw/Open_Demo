@@ -1,12 +1,7 @@
 'use client';
 
 import { displayToken, formatPercentage } from '@/lib/utils';
-
-interface TokenInfo {
-  token: string;
-  prob: number;
-  logprob: number;
-}
+import type { TokenInfo } from '@/lib/types';
 
 interface TokenTableProps {
   tokens: TokenInfo[];
