@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TreeNode } from '@/lib/types';
 import { displayToken, formatPercentage } from '@/lib/utils';
+import { cumulativeAt, nodeAtPath, phraseAtPath, siblingsAt, type TreeCache } from './treeCascade';
 import { Eyebrow, GhostButton } from './primitives';
 
 const NODE_W = 168;
@@ -17,68 +18,75 @@ const MAX_SCALE = 1.2;
 const colX = (level: number) => 204 + level * COL_PITCH;
 const rowY = (row: number) => TOP + row * ROW_PITCH;
 
-/** Siblings available at `level`, following the currently selected path. */
-function listAt(roots: TreeNode[], path: number[], level: number): TreeNode[] {
-  let list = roots;
-  for (let i = 0; i < level; i++) {
-    const node = list[path[i]];
-    if (!node) return [];
-    list = node.children;
-  }
-  return list;
-}
-
-function nodeAt(roots: TreeNode[], path: number[]): TreeNode | null {
-  let node: TreeNode | null = null;
-  let list = roots;
-  for (const index of path) {
-    node = list[index] ?? null;
-    if (!node) return null;
-    list = node.children;
-  }
-  return node;
-}
-
-/** The chain of most-probable tokens — index 0 at every level. */
-function greedyPath(roots: TreeNode[]): number[] {
-  const path: number[] = [];
-  let list = roots;
-  while (list.length > 0) {
-    path.push(0);
-    list = list[0].children;
-  }
-  return path;
-}
-
 export default function ProbabilityTreeV2({
-  roots,
   initialPhrase,
+  cache,
+  fetchLevel,
+  initialPath,
 }: {
-  roots: TreeNode[];
   initialPhrase: string;
+  /** A fresh Map on every update (copy-on-write) — see ExplorerV2. */
+  cache: TreeCache;
+  fetchLevel: (phrase: string) => Promise<TreeNode[]>;
+  /** The greedy chain already guaranteed cached by the parent's prefetch. */
+  initialPath: number[];
 }) {
-  const [path, setPath] = useState<number[]>(() => greedyPath(roots));
+  const [path, setPath] = useState<number[]>(initialPath);
+  // `cache` is a fresh Map per analysis (see ExplorerV2) — reference equality
+  // is exactly "did a new analysis start", the same trick the old `roots`
+  // reference check used.
+  const [renderedCache, setRenderedCache] = useState(cache);
   const [scale, setScale] = useState(1);
   const [autoFit, setAutoFit] = useState(true);
-  const [renderedRoots, setRenderedRoots] = useState(roots);
+  const [pendingPhrases, setPendingPhrases] = useState<Set<string>>(new Set());
+  const [nodeErrors, setNodeErrors] = useState<Map<string, string>>(new Map());
   const viewportRef = useRef<HTMLDivElement>(null);
 
-  // A new analysis replaces the tree: reset the open path during render rather
-  // than in an effect, so we never paint a path that belongs to the old tree.
-  if (renderedRoots !== roots) {
-    setRenderedRoots(roots);
-    setPath(greedyPath(roots));
+  if (renderedCache !== cache) {
+    setRenderedCache(cache);
+    setPath(initialPath);
     setAutoFit(true);
+    setPendingPhrases(new Set());
+    setNodeErrors(new Map());
   }
 
-  const { columns, links, rootTop, width, height } = useMemo(() => {
+  const expand = useCallback(
+    async (phrase: string) => {
+      if (cache.has(phrase) || pendingPhrases.has(phrase)) return;
+      setPendingPhrases((p) => new Set(p).add(phrase));
+      setNodeErrors((m) => {
+        if (!m.has(phrase)) return m;
+        const next = new Map(m);
+        next.delete(phrase);
+        return next;
+      });
+      try {
+        await fetchLevel(phrase);
+      } catch (err) {
+        setNodeErrors((m) => new Map(m).set(phrase, err instanceof Error ? err.message : 'Erreur inconnue'));
+      } finally {
+        setPendingPhrases((p) => {
+          const next = new Set(p);
+          next.delete(phrase);
+          return next;
+        });
+      }
+    },
+    [cache, fetchLevel, pendingPhrases],
+  );
+
+  const { columns, links, rootTop, width, height, pendingLevel, errorLevel } = useMemo(() => {
     const columns: { level: number; nodes: TreeNode[]; selected: number }[] = [];
 
     for (let level = 0; level <= path.length; level++) {
-      const nodes = listAt(roots, path, level);
+      const nodes = siblingsAt(cache, initialPhrase, path, level);
       if (nodes.length === 0) break;
       columns.push({ level, nodes, selected: path[level] ?? -1 });
     }
+
+    const frontier = phraseAtPath(cache, initialPhrase, path);
+    const pendingLevel = pendingPhrases.has(frontier) ? path.length : -1;
+    const errorLevel = nodeErrors.has(frontier) ? path.length : -1;
 
     const links: { d: string; onPath: boolean; width: number }[] = [];
 
@@ -105,8 +113,11 @@ export default function ProbabilityTreeV2({
       });
     }
 
-    const lastLevel = columns.length - 1;
-    const maxRows = columns.reduce((max, c) => Math.max(max, c.nodes.length), 1);
+    const lastLevel = Math.max(columns.length - 1, pendingLevel, errorLevel);
+    const maxRows = Math.max(
+      columns.reduce((max, c) => Math.max(max, c.nodes.length), 1),
+      pendingLevel >= 0 ? 3 : 0,
+    );
 
     return {
       columns,
@@ -114,8 +125,10 @@ export default function ProbabilityTreeV2({
       rootTop,
       width: lastLevel >= 0 ? colX(lastLevel) + NODE_W : ROOT_W,
       height: Math.max(rowY(maxRows - 1) + NODE_H, rootTop + NODE_H) + 12,
+      pendingLevel,
+      errorLevel,
     };
-  }, [roots, path]);
+  }, [cache, initialPhrase, path, pendingPhrases, nodeErrors]);
 
   // Fit the tree to the card on mount, on resize, and whenever it grows.
   useEffect(() => {
@@ -139,6 +152,14 @@ export default function ProbabilityTreeV2({
     setScale((s) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, +(s + delta).toFixed(2))));
   }, []);
 
+  const handleNodeClick = useCallback(
+    (level: number, row: number, node: TreeNode) => {
+      setPath((p) => [...p.slice(0, level), row]);
+      void expand(node.phrase);
+    },
+    [expand],
+  );
+
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
       const depth = path.length;
@@ -147,13 +168,18 @@ export default function ProbabilityTreeV2({
         event.preventDefault();
         setPath(path.slice(0, -1));
       } else if (event.key === 'ArrowRight') {
-        const children = listAt(roots, path, depth);
-        if (children.length === 0) return;
         event.preventDefault();
+        const frontier = phraseAtPath(cache, initialPhrase, path);
+        if (!cache.has(frontier)) {
+          void expand(frontier);
+          return;
+        }
+        const children = siblingsAt(cache, initialPhrase, path, depth);
+        if (children.length === 0) return;
         setPath([...path, 0]);
       } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
         if (depth === 0) return;
-        const siblings = listAt(roots, path, depth - 1);
+        const siblings = siblingsAt(cache, initialPhrase, path, depth - 1);
         const current = path[depth - 1];
         const next = event.key === 'ArrowUp' ? current - 1 : current + 1;
         if (next < 0 || next >= siblings.length) return;
@@ -161,13 +187,14 @@ export default function ProbabilityTreeV2({
         setPath([...path.slice(0, -1), next]);
       }
     },
-    [path, roots],
+    [path, cache, initialPhrase, expand],
   );
 
-  const selected = nodeAt(roots, path);
+  const selected = nodeAtPath(cache, initialPhrase, path);
   const suffix = selected ? selected.phrase.slice(initialPhrase.length) : '';
+  const selectedCandidates = selected ? cache.get(selected.phrase) : undefined;
 
-  if (roots.length === 0) return null;
+  if ((cache.get(initialPhrase) ?? []).length === 0) return null;
 
   return (
     <div>
@@ -191,7 +218,7 @@ export default function ProbabilityTreeV2({
             <span className="sr-only">Zoomer</span>
           </GhostButton>
           <GhostButton onClick={() => setAutoFit(true)}>Ajuster</GhostButton>
-          <GhostButton onClick={() => setPath(greedyPath(roots))}>Chemin glouton</GhostButton>
+          <GhostButton onClick={() => setPath(initialPath)}>Chemin glouton</GhostButton>
         </div>
       </div>
 
@@ -246,7 +273,7 @@ export default function ProbabilityTreeV2({
                   <button
                     key={row}
                     type="button"
-                    onClick={() => setPath([...path.slice(0, level), row])}
+                    onClick={() => handleNodeClick(level, row, node)}
                     aria-current={onPath ? 'true' : undefined}
                     className={`absolute overflow-hidden rounded-field px-2.5 pb-1.5 pt-1 text-left transition-shadow ${
                       onPath
@@ -286,6 +313,38 @@ export default function ProbabilityTreeV2({
               })}
             </div>
           ))}
+
+          {pendingLevel >= 0 && (
+            <>
+              <div
+                className="absolute text-[10.5px] font-semibold uppercase tracking-[0.09em] text-ink-subtle"
+                style={{ left: colX(pendingLevel), top: 0, width: NODE_W }}
+              >
+                Niveau {pendingLevel + 1}
+              </div>
+              {[0, 1, 2].map((row) => (
+                <div
+                  key={row}
+                  aria-hidden
+                  className="absolute animate-pulse rounded-field border border-line bg-surface-alt"
+                  style={{ left: colX(pendingLevel), top: rowY(row), width: NODE_W, height: NODE_H }}
+                />
+              ))}
+            </>
+          )}
+
+          {errorLevel >= 0 && (
+            <button
+              type="button"
+              onClick={() => void expand(phraseAtPath(cache, initialPhrase, path))}
+              className="absolute rounded-field border border-danger/30 bg-danger-soft px-3 py-2.5 text-left text-[12px] leading-snug text-danger transition-colors hover:border-danger/50"
+              style={{ left: colX(errorLevel), top: rowY(0), width: NODE_W }}
+            >
+              Échec du chargement
+              <br />
+              <span className="font-semibold">Réessayer</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -316,7 +375,7 @@ export default function ProbabilityTreeV2({
                   Cumulé
                 </dt>
                 <dd className="font-mono text-[15px] font-semibold tabular-nums">
-                  {formatPercentage(selected.cumulative)}
+                  {formatPercentage(cumulativeAt(cache, initialPhrase, path))}
                 </dd>
               </div>
               <div>
@@ -332,7 +391,7 @@ export default function ProbabilityTreeV2({
                   Candidats
                 </dt>
                 <dd className="font-mono text-[15px] tabular-nums text-ink-muted">
-                  {selected.children.length}
+                  {selectedCandidates ? selectedCandidates.length : '—'}
                 </dd>
               </div>
             </dl>

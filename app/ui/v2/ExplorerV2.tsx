@@ -1,8 +1,9 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import type { AnalysisResult, TreeNode } from '@/lib/types';
+import { useCallback, useRef, useState } from 'react';
+import type { TokenInfo, TreeNode } from '@/lib/types';
 import { formatPercentage } from '@/lib/utils';
+import { cumulativeAt, phraseAtPath, type TreeCache } from './treeCascade';
 import ProbabilityTreeV2 from './ProbabilityTreeV2';
 import TokenBarsV2 from './TokenBarsV2';
 import {
@@ -27,50 +28,79 @@ const STARTERS = [
   '2 + 2 =',
 ];
 
-/** Same arithmetic the classic UI shows: 3^depth leaves, (3^depth-1)/2+1 calls. */
-function costOf(depth: number) {
-  const leaves = Math.pow(3, depth);
-  return { leaves, calls: (leaves - 1) / 2 + 1 };
-}
-
-function greedyCompletion(roots: TreeNode[], phrase: string) {
-  if (roots.length === 0) return null;
-  let node = roots[0];
-  while (node.children.length > 0) node = node.children[0];
-  return { added: node.phrase.slice(phrase.length), cumulative: node.cumulative };
-}
-
 export default function ExplorerV2() {
   const [phrase, setPhrase] = useState('');
   const [depth, setDepth] = useState(4);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const [rootTopTokens, setRootTopTokens] = useState<TokenInfo[] | null>(null);
   const [usedPhrase, setUsedPhrase] = useState('');
+  const [initialPath, setInitialPath] = useState<number[]>([]);
   const [copied, setCopied] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  // Copy-on-write: every update replaces the Map with a new one, so plain
+  // reference equality tells ProbabilityTreeV2 both "the cache changed"
+  // (recompute) and "a new analysis started" (reset the open path).
+  const [cache, setCache] = useState<TreeCache>(() => new Map());
+
+  const fetchLevel = useCallback(async (phraseToFetch: string, signal?: AbortSignal): Promise<TreeNode[]> => {
+    // Callers (the prefetch loop below, ProbabilityTreeV2's click handler)
+    // are responsible for checking the cache first — this always fetches.
+    const res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phrase: phraseToFetch, depth: 1 }),
+      signal,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? 'Erreur serveur');
+
+    setCache((prev) => new Map(prev).set(phraseToFetch, data.tree));
+    return data.tree;
+  }, []);
 
   async function handleAnalyze() {
-    if (!phrase.trim()) return;
+    const trimmed = phrase.trim();
+    if (!trimmed) return;
 
     const controller = new AbortController();
     abortRef.current = controller;
     setLoading(true);
     setError(null);
-    setResult(null);
+    setRootTopTokens(null);
+    setCache(new Map());
 
     try {
+      // Root call: gives both the level-0 candidates (for the tree) and the
+      // full top-5 tokens (for the table) in one request.
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phrase: phrase.trim(), depth }),
+        body: JSON.stringify({ phrase: trimmed, depth: 1 }),
         signal: controller.signal,
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Erreur serveur');
-      setResult(data);
-      setUsedPhrase(phrase.trim());
+
+      setCache((prev) => new Map(prev).set(trimmed, data.tree));
+
+      // Sequentially open `depth` columns along the greedy (index-0) chain —
+      // `depth` requests total for `depth` levels, instead of the 3^depth
+      // leaves the old eager model computed to show the same handful of
+      // columns. Each iteration works off the array `fetchLevel` just
+      // returned, not off `cache` state — no dependency on render timing.
+      const path: number[] = [];
+      let candidates: TreeNode[] = data.tree;
+      for (let level = 0; level < depth; level++) {
+        if (candidates.length === 0) break;
+        path.push(0);
+        if (level === depth - 1) break;
+        candidates = await fetchLevel(candidates[0].phrase, controller.signal);
+      }
+
+      setInitialPath(path);
+      setRootTopTokens(data.topTokens);
+      setUsedPhrase(trimmed);
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
@@ -91,8 +121,12 @@ export default function ExplorerV2() {
     );
   }
 
-  const greedy = result ? greedyCompletion(result.tree, usedPhrase) : null;
-  const cost = costOf(depth);
+  const greedy = rootTopTokens
+    ? {
+        added: phraseAtPath(cache, usedPhrase, initialPath).slice(usedPhrase.length),
+        cumulative: cumulativeAt(cache, usedPhrase, initialPath),
+      }
+    : null;
 
   return (
     <main className="mx-auto w-full max-w-[1120px] px-6 py-10 sm:px-8 sm:py-11">
@@ -155,7 +189,6 @@ export default function ExplorerV2() {
             <div className="flex flex-wrap gap-2">
               {DEPTH_OPTIONS.map((d) => {
                 const active = depth === d;
-                const { calls } = costOf(d);
                 return (
                   <button
                     key={d}
@@ -171,12 +204,8 @@ export default function ExplorerV2() {
                     <span className={`block text-[15px] font-semibold ${active ? 'text-accent' : 'text-ink-muted'}`}>
                       {d}
                     </span>
-                    <span
-                      className={`mt-px block text-[10.5px] ${
-                        active ? 'text-accent' : d === 5 ? 'text-warning' : 'text-ink-subtle'
-                      }`}
-                    >
-                      {calls} appels
+                    <span className={`mt-px block text-[10.5px] ${active ? 'text-accent' : 'text-ink-subtle'}`}>
+                      {d} appels
                     </span>
                   </button>
                 );
@@ -210,8 +239,7 @@ export default function ExplorerV2() {
         </div>
 
         <p className="mt-4 border-t border-line-soft pt-3.5 text-[12.5px] text-ink-subtle">
-          {`${cost.leaves} feuilles explorées · ${cost.calls} appels à l'API`}
-          {depth === 5 && <span className="text-warning"> · peut approcher la limite de 60 s</span>}
+          {`${depth} appels pour ouvrir ${depth} niveaux · un appel de plus à chaque clic au-delà`}
         </p>
       </Card>
 
@@ -240,7 +268,7 @@ export default function ExplorerV2() {
       )}
 
       {/* ── Results ──────────────────────────────────────────────────── */}
-      {result && greedy && !loading && (
+      {rootTopTokens && greedy && !loading && (
         <div className="space-y-6">
           <Card>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -275,17 +303,22 @@ export default function ExplorerV2() {
                 <span className="font-mono text-ink-muted">{usedPhrase}</span>
               </p>
             </div>
-            <TokenBarsV2 tokens={result.topTokens} />
+            <TokenBarsV2 tokens={rootTopTokens} />
           </Card>
 
           <Card padded={false} className="overflow-hidden">
-            <ProbabilityTreeV2 roots={result.tree} initialPhrase={usedPhrase} />
+            <ProbabilityTreeV2
+              initialPhrase={usedPhrase}
+              cache={cache}
+              fetchLevel={fetchLevel}
+              initialPath={initialPath}
+            />
           </Card>
         </div>
       )}
 
       {/* ── Empty state ──────────────────────────────────────────────── */}
-      {!result && !loading && !error && (
+      {!rootTopTokens && !loading && !error && (
         <div className="grid gap-5 sm:grid-cols-3">
           {[
             {
@@ -310,7 +343,7 @@ export default function ExplorerV2() {
             },
             {
               title: '3 · On recommence',
-              body: "Chaque candidat devient une nouvelle phrase à compléter. D'où l'arbre — et l'explosion du nombre d'appels.",
+              body: "Chaque candidat devient une nouvelle phrase à compléter. D'où l'arbre.",
               icon: (
                 <>
                   <circle cx="4" cy="10" r="1.6" />
