@@ -235,7 +235,7 @@ export default function ProbabilityTreeV2({
           {columns.map(({ level, nodes, selected: selectedRow }) => (
             <div key={level}>
               <div
-                className="absolute text-[10.5px] font-semibold uppercase tracking-[0.09em] text-line-strong"
+                className="absolute text-[10.5px] font-semibold uppercase tracking-[0.09em] text-ink-subtle"
                 style={{ left: colX(level), top: 0, width: NODE_W }}
               >
                 Niveau {level + 1}
