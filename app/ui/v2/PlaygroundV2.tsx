@@ -16,6 +16,7 @@ import {
 } from './primitives';
 
 const MODEL = 'gpt-4.1-mini';
+const MAX_PROMPT_LENGTH = 4000;
 
 const QUICK_PROMPTS = [
   { label: 'ML pour enfant', text: 'Explique le machine learning à un enfant de 8 ans.' },
@@ -125,6 +126,7 @@ export default function PlaygroundV2() {
             <textarea
               id="prompt"
               rows={5}
+              maxLength={MAX_PROMPT_LENGTH}
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={(e) => {

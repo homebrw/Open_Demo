@@ -1,4 +1,5 @@
 import { getOpenAIClient } from '@/lib/openai';
+import { checkRateLimit, clientIp } from '@/lib/rateLimit';
 
 export const maxDuration = 60;
 
@@ -6,13 +7,31 @@ export const maxDuration = 60;
 const PRICE_INPUT_PER_TOKEN = 0.40 / 1_000_000;
 const PRICE_OUTPUT_PER_TOKEN = 1.60 / 1_000_000;
 
+const MAX_PROMPT_LENGTH = 4000;
+const RATE_LIMIT = 30;
+const RATE_WINDOW_MS = 10 * 60 * 1000;
+
 export async function POST(request: Request) {
   try {
+    if (!checkRateLimit(`playground:${clientIp(request)}`, RATE_LIMIT, RATE_WINDOW_MS)) {
+      return Response.json(
+        { error: 'Trop de requêtes. Réessayez dans quelques minutes.' },
+        { status: 429 },
+      );
+    }
+
     const body = await request.json();
     const prompt: string = body?.prompt?.trim();
 
     if (!prompt) {
       return Response.json({ error: 'Le champ "prompt" est requis.' }, { status: 400 });
+    }
+
+    if (prompt.length > MAX_PROMPT_LENGTH) {
+      return Response.json(
+        { error: `Le champ "prompt" ne peut pas dépasser ${MAX_PROMPT_LENGTH} caractères.` },
+        { status: 400 },
+      );
     }
 
     const temperature: number = Math.min(Math.max(Number(body?.temperature ?? 0.7), 0), 2);

@@ -1,6 +1,11 @@
 import { getOpenAIClient } from '@/lib/openai';
+import { checkRateLimit, clientIp } from '@/lib/rateLimit';
 
 export const maxDuration = 60;
+
+const MAX_PHRASE_LENGTH = 400;
+const RATE_LIMIT = 30;
+const RATE_WINDOW_MS = 10 * 60 * 1000;
 
 export interface TokenInfo {
   token: string;
@@ -75,11 +80,25 @@ async function buildTree(
 
 export async function POST(request: Request) {
   try {
+    if (!checkRateLimit(`analyze:${clientIp(request)}`, RATE_LIMIT, RATE_WINDOW_MS)) {
+      return Response.json(
+        { error: 'Trop de requêtes. Réessayez dans quelques minutes.' },
+        { status: 429 },
+      );
+    }
+
     const body = await request.json();
     const phrase: string = body?.phrase?.trim();
 
     if (!phrase) {
       return Response.json({ error: 'Le champ "phrase" est requis.' }, { status: 400 });
+    }
+
+    if (phrase.length > MAX_PHRASE_LENGTH) {
+      return Response.json(
+        { error: `Le champ "phrase" ne peut pas dépasser ${MAX_PHRASE_LENGTH} caractères.` },
+        { status: 400 },
+      );
     }
 
     const depth: number = Math.min(Math.max(Number(body?.depth) || 4, 1), 5);
