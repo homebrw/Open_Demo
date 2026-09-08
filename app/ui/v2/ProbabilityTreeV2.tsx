@@ -21,29 +21,32 @@ const rowY = (row: number) => TOP + row * ROW_PITCH;
 export default function ProbabilityTreeV2({
   initialPhrase,
   cache,
+  analysisId,
   fetchLevel,
   initialPath,
 }: {
   initialPhrase: string;
-  /** A fresh Map on every update (copy-on-write) — see ExplorerV2. */
+  /** A fresh Map on every update (copy-on-write) — see ExplorerV2. It changes
+   *  on EVERY fetch, including a click-driven expansion, so it drives
+   *  recomputation below but must NOT be used to detect "new analysis". */
   cache: TreeCache;
+  /** Bumped once per "Analyser" run, and only then — the actual signal for
+   *  "reset the open path", kept separate from `cache`'s reference. */
+  analysisId: number;
   fetchLevel: (phrase: string) => Promise<TreeNode[]>;
   /** The greedy chain already guaranteed cached by the parent's prefetch. */
   initialPath: number[];
 }) {
   const [path, setPath] = useState<number[]>(initialPath);
-  // `cache` is a fresh Map per analysis (see ExplorerV2) — reference equality
-  // is exactly "did a new analysis start", the same trick the old `roots`
-  // reference check used.
-  const [renderedCache, setRenderedCache] = useState(cache);
+  const [renderedAnalysisId, setRenderedAnalysisId] = useState(analysisId);
   const [scale, setScale] = useState(1);
   const [autoFit, setAutoFit] = useState(true);
   const [pendingPhrases, setPendingPhrases] = useState<Set<string>>(new Set());
   const [nodeErrors, setNodeErrors] = useState<Map<string, string>>(new Map());
   const viewportRef = useRef<HTMLDivElement>(null);
 
-  if (renderedCache !== cache) {
-    setRenderedCache(cache);
+  if (renderedAnalysisId !== analysisId) {
+    setRenderedAnalysisId(analysisId);
     setPath(initialPath);
     setAutoFit(true);
     setPendingPhrases(new Set());

@@ -38,10 +38,14 @@ export default function ExplorerV2() {
   const [initialPath, setInitialPath] = useState<number[]>([]);
   const [copied, setCopied] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
-  // Copy-on-write: every update replaces the Map with a new one, so plain
-  // reference equality tells ProbabilityTreeV2 both "the cache changed"
-  // (recompute) and "a new analysis started" (reset the open path).
+  // Copy-on-write: every update replaces the Map with a new one, so its
+  // reference tells ProbabilityTreeV2 "the cache changed, recompute" — but
+  // that fires on EVERY fetch, including a click-driven expansion, not just
+  // a new "Analyser" run. analysisId is the separate signal for "an entire
+  // new analysis started, reset the open path" — bumped once per
+  // handleAnalyze call, nothing else.
   const [cache, setCache] = useState<TreeCache>(() => new Map());
+  const [analysisId, setAnalysisId] = useState(0);
 
   const fetchLevel = useCallback(async (phraseToFetch: string, signal?: AbortSignal): Promise<TreeNode[]> => {
     // Callers (the prefetch loop below, ProbabilityTreeV2's click handler)
@@ -69,6 +73,7 @@ export default function ExplorerV2() {
     setError(null);
     setRootTopTokens(null);
     setCache(new Map());
+    setAnalysisId((id) => id + 1);
 
     try {
       // Root call: gives both the level-0 candidates (for the tree) and the
@@ -310,6 +315,7 @@ export default function ExplorerV2() {
             <ProbabilityTreeV2
               initialPhrase={usedPhrase}
               cache={cache}
+              analysisId={analysisId}
               fetchLevel={fetchLevel}
               initialPath={initialPath}
             />
