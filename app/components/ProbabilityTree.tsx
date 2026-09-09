@@ -1,14 +1,7 @@
 'use client';
 
 import { displayToken, formatPercentage } from '@/lib/utils';
-
-export interface TreeNode {
-  token: string;
-  prob: number;
-  cumulative: number;
-  phrase: string;
-  children: TreeNode[];
-}
+import type { TreeNode } from '@/lib/types';
 
 const LEAF_WIDTH = 80;
 const CONNECTOR_H = 18;
