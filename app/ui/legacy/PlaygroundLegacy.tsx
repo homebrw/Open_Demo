@@ -1,15 +1,10 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
+import { useT } from '../../locale/useT';
+import { useLocale } from '../../locale/LocaleProvider';
 
 const MODEL = 'gpt-4.1-mini';
-
-const QUICK_PROMPTS = [
-  { label: 'ML pour enfant', text: 'Explique le machine learning à un enfant de 8 ans.' },
-  { label: 'Slogan IA', text: 'Écris un slogan accrocheur pour une agence spécialisée en intelligence artificielle.' },
-  { label: 'Produit absurde', text: 'Invente un produit absurde et inutile, avec un nom, une description et un prix.' },
-  { label: 'Pirate', text: 'Raconte une courte histoire de pirate en 3 paragraphes.' },
-];
 
 interface GenerationResult {
   text: string;
@@ -83,16 +78,16 @@ function SliderField({
 function ResultCard({
   index,
   result,
-  params,
+  generationLabel,
 }: {
   index: number;
   result: GenerationResult;
-  params: Params;
+  generationLabel: string;
 }) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
       <div className="px-4 py-2 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-        <span className="text-xs font-semibold text-gray-500">Génération {index + 1}</span>
+        <span className="text-xs font-semibold text-gray-500">{generationLabel} {index + 1}</span>
         <div className="flex items-center gap-3 text-[10px] text-gray-400 font-mono">
           <span>{result.latency}ms</span>
           {result.usage && (
@@ -115,6 +110,9 @@ function ResultCard({
 }
 
 export default function PlaygroundLegacy() {
+  const t = useT();
+  const locale = useLocale();
+  const QUICK_PROMPTS = t.playgroundLegacy.quickPrompts;
   const [prompt, setPrompt] = useState('');
   const [params, setParams] = useState<Params>({
     temperature: 0.7,
@@ -146,10 +144,11 @@ export default function PlaygroundLegacy() {
             temperature: runParams.temperature,
             top_p: runParams.top_p,
             max_output_tokens: runParams.max_output_tokens,
+            locale,
           }),
         }).then(async (res) => {
           const data = await res.json();
-          if (!res.ok) return { text: '', usage: null, latency: 0, cost: null, error: data.error ?? 'Erreur serveur' };
+          if (!res.ok) return { text: '', usage: null, latency: 0, cost: null, error: data.error ?? t.common.unknownError };
           return data as GenerationResult;
         })
       );
@@ -158,7 +157,7 @@ export default function PlaygroundLegacy() {
       const entry: HistoryEntry = { id: nextId.current++, prompt: runPrompt.trim(), params: { ...runParams }, results };
       setHistory((h) => [entry, ...h]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      setError(err instanceof Error ? err.message : t.common.unknownError);
     } finally {
       setLoading(false);
     }
@@ -174,10 +173,10 @@ export default function PlaygroundLegacy() {
         {/* Header */}
         <header className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            🎛️ Playground de paramètres
+            {t.playgroundLegacy.title}
           </h1>
           <p className="text-gray-500 text-sm">
-            Expérimentez l&apos;impact de la température, top_p et des autres paramètres sur les sorties de{' '}
+            {t.playgroundLegacy.subtitlePrefix}{' '}
             <span className="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-700">{MODEL}</span>
           </p>
         </header>
@@ -188,7 +187,7 @@ export default function PlaygroundLegacy() {
             {/* Prompt */}
             <section className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Prompt
+                {t.playgroundLegacy.promptLabel}
               </label>
 
               {/* Quick prompts */}
@@ -207,22 +206,22 @@ export default function PlaygroundLegacy() {
               <textarea
                 className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#378ADD] focus:border-transparent transition"
                 rows={5}
-                placeholder="Entrez votre prompt ici…"
+                placeholder={t.playgroundLegacy.promptPlaceholder}
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleGenerate();
                 }}
               />
-              <p className="text-[10px] text-gray-400 mt-1">Ctrl+Enter pour générer</p>
+              <p className="text-[10px] text-gray-400 mt-1">{t.playgroundLegacy.promptHint}</p>
             </section>
 
             {/* Parameters */}
             <section className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-5">
-              <h2 className="text-sm font-semibold text-gray-800">Paramètres</h2>
+              <h2 className="text-sm font-semibold text-gray-800">{t.playgroundLegacy.parametersTitle}</h2>
 
               <SliderField
-                label="Temperature"
+                label={t.playgroundLegacy.temperature}
                 value={params.temperature}
                 min={0}
                 max={2}
@@ -230,7 +229,7 @@ export default function PlaygroundLegacy() {
                 onChange={(v) => setParam('temperature', v)}
               />
               <SliderField
-                label="Top_p"
+                label={t.playgroundLegacy.topP}
                 value={params.top_p}
                 min={0}
                 max={1}
@@ -241,7 +240,7 @@ export default function PlaygroundLegacy() {
               {/* Max tokens */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Max output tokens
+                  {t.playgroundLegacy.maxOutputTokens}
                 </label>
                 <input
                   type="number"
@@ -255,13 +254,13 @@ export default function PlaygroundLegacy() {
 
               {/* Seed note */}
               <div className="rounded-lg bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-700">
-                <strong>Seed</strong> non supporté par l&apos;API Responses — la reproductibilité n&apos;est pas disponible sur ce modèle.
+                <strong>{t.playgroundLegacy.seedLabel}</strong> {t.playgroundLegacy.seedNote}
               </div>
 
               {/* Count */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre de générations
+                  {t.playgroundLegacy.countLabel}
                 </label>
                 <div className="flex gap-1.5">
                   {[1, 2, 3, 4].map((n) => (
@@ -294,33 +293,33 @@ export default function PlaygroundLegacy() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                     </svg>
-                    Génération en cours…
+                    {t.playgroundLegacy.generating}
                   </span>
                 ) : (
-                  'Générer'
+                  t.playgroundLegacy.generate
                 )}
               </button>
             </section>
 
             {/* Pedagogy card */}
             <section className="bg-white rounded-xl border border-blue-100 p-5 shadow-sm">
-              <h2 className="text-sm font-semibold text-gray-800 mb-3">💡 Guide des paramètres</h2>
+              <h2 className="text-sm font-semibold text-gray-800 mb-3">{t.playgroundLegacy.guideTitle}</h2>
               <dl className="space-y-3 text-xs text-gray-600">
                 <div>
-                  <dt className="font-semibold text-gray-700 mb-0.5">Temperature</dt>
-                  <dd>Contrôle la créativité. À 0, le modèle choisit toujours le token le plus probable. À 2, il explore des alternatives improbables — plus surprenant mais moins cohérent.</dd>
+                  <dt className="font-semibold text-gray-700 mb-0.5">{t.playgroundLegacy.guideTemperatureTitle}</dt>
+                  <dd>{t.playgroundLegacy.guideTemperatureBody}</dd>
                 </div>
                 <div>
-                  <dt className="font-semibold text-gray-700 mb-0.5">Top_p</dt>
-                  <dd>Filtre le vocabulaire candidat. À 0.1, seuls les tokens représentant les 10 % de probabilité cumulée sont éligibles. À 1.0, tout le vocabulaire est disponible.</dd>
+                  <dt className="font-semibold text-gray-700 mb-0.5">{t.playgroundLegacy.guideTopPTitle}</dt>
+                  <dd>{t.playgroundLegacy.guideTopPBody}</dd>
                 </div>
                 <div>
-                  <dt className="font-semibold text-gray-700 mb-0.5">Max output tokens</dt>
-                  <dd>Longueur maximale de la réponse en tokens (≈ ¾ d&apos;un mot en français). Une valeur trop basse tronque la réponse.</dd>
+                  <dt className="font-semibold text-gray-700 mb-0.5">{t.playgroundLegacy.guideMaxTokensTitle}</dt>
+                  <dd>{t.playgroundLegacy.guideMaxTokensBody}</dd>
                 </div>
                 <div>
-                  <dt className="font-semibold text-gray-700 mb-0.5">Seed</dt>
-                  <dd>Fixe le générateur aléatoire. Deux appels avec le même seed et les mêmes paramètres produisent (en théorie) la même réponse — utile pour reproduire un résultat.</dd>
+                  <dt className="font-semibold text-gray-700 mb-0.5">{t.playgroundLegacy.guideSeedTitle}</dt>
+                  <dd>{t.playgroundLegacy.guideSeedBody}</dd>
                 </div>
               </dl>
             </section>
@@ -330,7 +329,7 @@ export default function PlaygroundLegacy() {
           <div className="flex flex-col gap-5">
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
-                <strong>Erreur :</strong> {error}
+                <strong>{t.playgroundLegacy.errorLabel}</strong> {error}
               </div>
             )}
 
@@ -340,7 +339,7 @@ export default function PlaygroundLegacy() {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="#378ADD" strokeWidth="4" />
                   <path className="opacity-75" fill="#378ADD" d="M4 12a8 8 0 018-8v8H4z" />
                 </svg>
-                <span className="text-sm text-gray-500">Génération en cours…</span>
+                <span className="text-sm text-gray-500">{t.playgroundLegacy.generating}</span>
               </div>
             )}
 
@@ -374,7 +373,7 @@ export default function PlaygroundLegacy() {
                       disabled={loading}
                       className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50 transition shrink-0"
                     >
-                      🔄 Relancer
+                      {t.playgroundLegacy.rerun}
                     </button>
                   </div>
                 </div>
@@ -392,7 +391,7 @@ export default function PlaygroundLegacy() {
                   }`}
                 >
                   {entry.results.map((r, i) => (
-                    <ResultCard key={i} index={i} result={r} params={entry.params} />
+                    <ResultCard key={i} index={i} result={r} generationLabel={t.playgroundLegacy.generation} />
                   ))}
                 </div>
               </div>
@@ -401,9 +400,9 @@ export default function PlaygroundLegacy() {
             {history.length === 0 && !loading && (
               <div className="flex-1 flex items-center justify-center min-h-[300px]">
                 <p className="text-gray-400 text-sm text-center">
-                  Entrez un prompt et cliquez sur <strong>Générer</strong> pour voir les résultats ici.
+                  {t.playgroundLegacy.emptyStatePrefix} <strong>{t.playgroundLegacy.emptyStateButton}</strong> {t.playgroundLegacy.emptyStateSuffix}
                   <br />
-                  <span className="text-xs">Chaque génération s&apos;empile en haut pour faciliter la comparaison.</span>
+                  <span className="text-xs">{t.playgroundLegacy.emptyStateHint}</span>
                 </p>
               </div>
             )}

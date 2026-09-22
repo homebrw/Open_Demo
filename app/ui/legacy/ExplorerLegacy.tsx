@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import TokenTable from '../../components/TokenTable';
 import ProbabilityTree from '../../components/ProbabilityTree';
+import { useT } from '../../locale/useT';
+import { useLocale } from '../../locale/LocaleProvider';
 import type { AnalysisResult, TreeNode } from '@/lib/types';
 
 function getGreedyCompletion(roots: TreeNode[], initialPhrase: string) {
@@ -15,6 +17,8 @@ function getGreedyCompletion(roots: TreeNode[], initialPhrase: string) {
 const DEPTH_OPTIONS = [2, 3, 4, 5];
 
 export default function ExplorerLegacy() {
+  const t = useT();
+  const locale = useLocale();
   const [phrase, setPhrase] = useState('');
   const [depth, setDepth] = useState(4);
   const [loading, setLoading] = useState(false);
@@ -32,15 +36,15 @@ export default function ExplorerLegacy() {
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phrase: phrase.trim(), depth }),
+        body: JSON.stringify({ phrase: phrase.trim(), depth, locale }),
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Erreur serveur');
+      if (!res.ok) throw new Error(data.error ?? t.common.unknownError);
       setResult(data);
       setUsedPhrase(phrase.trim());
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      setError(err instanceof Error ? err.message : t.common.unknownError);
     } finally {
       setLoading(false);
     }
@@ -53,21 +57,21 @@ export default function ExplorerLegacy() {
       <div className="max-w-[1200px] mx-auto px-4 py-10">
         <header className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            🧠 Explorateur de Logits OpenAI
+            {t.explorerLegacy.title}
           </h1>
           <p className="text-gray-500 text-sm">
-            Visualisez l&apos;arbre de probabilités des tokens générés par gpt-3.5-turbo-instruct
+            {t.explorerLegacy.subtitle}
           </p>
         </header>
 
         <section className="bg-white rounded-xl border border-gray-200 p-6 mb-6 shadow-sm">
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Phrase à compléter
+            {t.explorerLegacy.phraseLabel}
           </label>
           <textarea
             className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#378ADD] focus:border-transparent transition"
             rows={3}
-            placeholder="Ex: La vie est"
+            placeholder={t.explorerLegacy.phrasePlaceholder}
             value={phrase}
             onChange={(e) => setPhrase(e.target.value)}
             onKeyDown={(e) => {
@@ -78,7 +82,7 @@ export default function ExplorerLegacy() {
           <div className="flex items-center justify-between mt-4">
             {/* Depth selector */}
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 font-medium">Profondeur :</span>
+              <span className="text-xs text-gray-500 font-medium">{t.explorerLegacy.depthLabel}</span>
               <div className="flex gap-1">
                 {DEPTH_OPTIONS.map((d) => (
                   <button
@@ -96,12 +100,12 @@ export default function ExplorerLegacy() {
                 ))}
               </div>
               <span className="text-xs text-gray-400">
-                → {Math.pow(3, depth)} feuilles, {(Math.pow(3, depth) - 1) / 2 + 1} appels API
+                {t.explorerLegacy.depthSuffix(Math.pow(3, depth), (Math.pow(3, depth) - 1) / 2 + 1)}
               </span>
             </div>
 
             <div className="flex items-center gap-3">
-              <span className="text-xs text-gray-400">Ctrl+Enter</span>
+              <span className="text-xs text-gray-400">{t.explorerLegacy.ctrlEnter}</span>
               <button
                 onClick={handleAnalyze}
                 disabled={loading || !phrase.trim()}
@@ -114,10 +118,10 @@ export default function ExplorerLegacy() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                     </svg>
-                    Construction…
+                    {t.explorerLegacy.building}
                   </span>
                 ) : (
-                  'Analyser'
+                  t.explorerLegacy.analyze
                 )}
               </button>
             </div>
@@ -126,7 +130,7 @@ export default function ExplorerLegacy() {
 
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm mb-6">
-            <strong>Erreur :</strong> {error}
+            <strong>{t.explorerLegacy.errorLabel}</strong> {error}
           </div>
         )}
 
@@ -135,7 +139,7 @@ export default function ExplorerLegacy() {
             {/* Greedy completion */}
             <section className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
               <h2 className="text-base font-semibold text-gray-800 mb-3">
-                Complétion la plus probable
+                {t.explorerLegacy.greedyTitle}
               </h2>
               <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 font-mono text-sm leading-relaxed whitespace-pre-wrap">
                 <span className="text-gray-600">{usedPhrase}</span>
@@ -146,7 +150,7 @@ export default function ExplorerLegacy() {
             {/* Top tokens table */}
             <section className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
               <h2 className="text-base font-semibold text-gray-800 mb-4">
-                Top tokens — premier niveau
+                {t.explorerLegacy.topTokensTitle}
               </h2>
               <TokenTable tokens={result.topTokens} />
             </section>
@@ -154,10 +158,10 @@ export default function ExplorerLegacy() {
             {/* Probability tree */}
             <section className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
               <h2 className="text-base font-semibold text-gray-800 mb-1">
-                Arbre de probabilités (profondeur {depth} × 3 branches)
+                {t.explorerLegacy.treeTitle(depth)}
               </h2>
               <p className="text-xs text-gray-400 mb-5">
-                Chemin glouton en bleu · hover sur un token pour voir la phrase complète et la probabilité cumulée · scroll horizontal disponible
+                {t.explorerLegacy.treeHint}
               </p>
               <ProbabilityTree roots={result.tree} initialPhrase={usedPhrase} />
             </section>

@@ -1,6 +1,7 @@
 'use client';
 
 import { displayToken, formatPercentage } from '@/lib/utils';
+import { useT } from '../locale/useT';
 import type { TokenInfo } from '@/lib/types';
 
 interface TokenTableProps {
@@ -8,15 +9,16 @@ interface TokenTableProps {
 }
 
 export default function TokenTable({ tokens }: TokenTableProps) {
+  const t = useT();
   return (
     <div className="overflow-x-auto rounded-lg border border-gray-200">
       <table className="w-full text-sm">
         <thead>
           <tr className="bg-gray-50 text-left text-gray-600 uppercase text-xs tracking-wider">
-            <th className="px-4 py-3 w-10">#</th>
-            <th className="px-4 py-3">Token</th>
-            <th className="px-4 py-3">Probabilité</th>
-            <th className="px-4 py-3">Log-prob</th>
+            <th className="px-4 py-3 w-10">{t.tokenTable.index}</th>
+            <th className="px-4 py-3">{t.tokenTable.token}</th>
+            <th className="px-4 py-3">{t.tokenTable.probability}</th>
+            <th className="px-4 py-3">{t.tokenTable.logprob}</th>
           </tr>
         </thead>
         <tbody>

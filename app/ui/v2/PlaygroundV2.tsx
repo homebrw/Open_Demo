@@ -14,16 +14,11 @@ import {
   PrimaryButton,
   Spinner,
 } from './primitives';
+import { useT } from '../../locale/useT';
+import { useLocale } from '../../locale/LocaleProvider';
 
 const MODEL = 'gpt-4.1-mini';
 const MAX_PROMPT_LENGTH = 4000;
-
-const QUICK_PROMPTS = [
-  { label: 'ML pour enfant', text: 'Explique le machine learning à un enfant de 8 ans.' },
-  { label: 'Slogan IA', text: 'Écris un slogan accrocheur pour une agence spécialisée en intelligence artificielle.' },
-  { label: 'Produit absurde', text: 'Invente un produit absurde et inutile, avec un nom, une description et un prix.' },
-  { label: 'Pirate', text: 'Raconte une courte histoire de pirate en 3 paragraphes.' },
-];
 
 const DEFAULT_PARAMS: Params = {
   temperature: 0.7,
@@ -40,6 +35,9 @@ function gridFor(count: number) {
 }
 
 export default function PlaygroundV2() {
+  const t = useT();
+  const locale = useLocale();
+  const QUICK_PROMPTS = t.playgroundV2.quickPrompts;
   const [prompt, setPrompt] = useState('');
   const [params, setParams] = useState<Params>(DEFAULT_PARAMS);
   const [loading, setLoading] = useState(false);
@@ -67,6 +65,7 @@ export default function PlaygroundV2() {
             temperature: runParams.temperature,
             top_p: runParams.top_p,
             max_output_tokens: runParams.max_output_tokens,
+            locale,
           }),
         }).then(async (res) => {
           const data = await res.json();
@@ -76,7 +75,7 @@ export default function PlaygroundV2() {
               usage: null,
               latency: 0,
               cost: null,
-              error: data.error ?? 'Erreur serveur',
+              error: data.error ?? t.common.unknownError,
             } satisfies GenerationResult;
           }
           return data as GenerationResult;
@@ -89,7 +88,7 @@ export default function PlaygroundV2() {
         ...h,
       ]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      setError(err instanceof Error ? err.message : t.common.unknownError);
     } finally {
       setLoading(false);
     }
@@ -104,15 +103,15 @@ export default function PlaygroundV2() {
   return (
     <main className="mx-auto w-full max-w-[1120px] px-6 py-10 sm:px-8 sm:py-11">
       <PageHeader
-        eyebrow="Playground"
+        eyebrow={t.playgroundV2.eyebrow}
         title={
           <>
-            Le même prompt,
+            {t.playgroundV2.titleLine1}
             <br />
-            mille réponses possibles
+            {t.playgroundV2.titleLine2}
           </>
         }
-        lede="Faites varier la température et le top_p, relancez, comparez. Chaque génération conserve ses réglages, sa latence et son coût."
+        lede={t.playgroundV2.lede}
         model={MODEL}
       />
 
@@ -121,7 +120,7 @@ export default function PlaygroundV2() {
         <div className="flex flex-col gap-5 lg:sticky lg:top-24">
           <Card className="!px-5 !py-5">
             <label htmlFor="prompt" className="mb-3 block text-[13px] font-semibold text-ink">
-              Prompt
+              {t.playgroundV2.promptLabel}
             </label>
             <textarea
               id="prompt"
@@ -132,7 +131,7 @@ export default function PlaygroundV2() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) runGenerate(prompt, params);
               }}
-              placeholder="Décrivez ce que le modèle doit produire…"
+              placeholder={t.playgroundV2.promptPlaceholder}
               className="w-full resize-none rounded-field border border-line bg-surface px-3.5 py-3 text-sm leading-relaxed text-ink transition-shadow placeholder:text-ink-faint focus:border-accent-line focus:outline-none focus:ring-[3px] focus:ring-accent/10"
             />
             <div className="mt-3 flex flex-wrap gap-1.5">
@@ -157,38 +156,38 @@ export default function PlaygroundV2() {
           </Card>
 
           <Card className="!px-5 !py-5">
-            <Eyebrow className="mb-5">Paramètres</Eyebrow>
+            <Eyebrow className="mb-5">{t.playgroundV2.parametersTitle}</Eyebrow>
 
             <div className="space-y-6">
               <SliderFieldV2
-                label="Température"
+                label={t.playgroundV2.temperature}
                 value={params.temperature}
                 min={0}
                 max={2}
                 step={0.1}
                 decimals={1}
-                lowLabel="Déterministe"
-                highLabel="Créatif"
+                lowLabel={t.playgroundV2.temperatureLow}
+                highLabel={t.playgroundV2.temperatureHigh}
                 onChange={(v) => setParam('temperature', v)}
               />
               <SliderFieldV2
-                label="Top_p"
+                label={t.playgroundV2.topP}
                 value={params.top_p}
                 min={0}
                 max={1}
                 step={0.05}
                 decimals={2}
-                lowLabel="Vocabulaire restreint"
-                highLabel="Tout le vocabulaire"
+                lowLabel={t.playgroundV2.topPLow}
+                highLabel={t.playgroundV2.topPHigh}
                 onChange={(v) => setParam('top_p', v)}
               />
 
               <div>
                 <div className="mb-2.5 flex items-baseline justify-between">
                   <label htmlFor="max-tokens" className="text-[13.5px] font-semibold text-ink">
-                    Longueur maximale
+                    {t.playgroundV2.maxLengthLabel}
                   </label>
-                  <span className="text-[11px] text-ink-subtle">1 – 4096 tokens</span>
+                  <span className="text-[11px] text-ink-subtle">{t.playgroundV2.maxLengthRange}</span>
                 </div>
                 <input
                   id="max-tokens"
@@ -208,7 +207,7 @@ export default function PlaygroundV2() {
 
               <div>
                 <div className="mb-2.5 text-[13.5px] font-semibold text-ink">
-                  Générations en parallèle
+                  {t.playgroundV2.parallelGenerationsLabel}
                 </div>
                 <div className="grid grid-cols-4 gap-1.5">
                   {[1, 2, 3, 4].map((n) => {
@@ -240,11 +239,11 @@ export default function PlaygroundV2() {
                 {loading ? (
                   <>
                     <Spinner className="h-4 w-4" />
-                    Génération en cours…
+                    {t.playgroundV2.generating}
                   </>
                 ) : (
                   <>
-                    Générer
+                    {t.playgroundV2.generate}
                     <span className="hidden sm:flex sm:items-center sm:gap-1">
                       <Kbd>⌘</Kbd>
                       <Kbd>↵</Kbd>
@@ -262,7 +261,7 @@ export default function PlaygroundV2() {
               aria-expanded={guideOpen}
               className="flex w-full items-center justify-between text-left"
             >
-              <span className="text-[13.5px] font-semibold text-ink">Guide des paramètres</span>
+              <span className="text-[13.5px] font-semibold text-ink">{t.playgroundV2.guideTitle}</span>
               <svg
                 width="14"
                 height="14"
@@ -282,39 +281,33 @@ export default function PlaygroundV2() {
             {guideOpen ? (
               <dl className="mt-4 space-y-3.5 text-[13px] text-ink-muted">
                 <div>
-                  <dt className="mb-0.5 font-semibold text-ink">Température</dt>
+                  <dt className="mb-0.5 font-semibold text-ink">{t.playgroundV2.guideTemperatureTitle}</dt>
                   <dd className="leading-relaxed text-pretty">
-                    Contrôle la créativité. À 0, le modèle choisit toujours le token le plus
-                    probable. À 2, il explore des alternatives improbables — plus surprenant mais
-                    moins cohérent.
+                    {t.playgroundV2.guideTemperatureBody}
                   </dd>
                 </div>
                 <div>
-                  <dt className="mb-0.5 font-semibold text-ink">Top_p</dt>
+                  <dt className="mb-0.5 font-semibold text-ink">{t.playgroundV2.guideTopPTitle}</dt>
                   <dd className="leading-relaxed text-pretty">
-                    Filtre le vocabulaire candidat. À 0.1, seuls les tokens représentant les 10 % de
-                    probabilité cumulée sont éligibles. À 1.0, tout le vocabulaire est disponible.
+                    {t.playgroundV2.guideTopPBody}
                   </dd>
                 </div>
                 <div>
-                  <dt className="mb-0.5 font-semibold text-ink">Longueur maximale</dt>
+                  <dt className="mb-0.5 font-semibold text-ink">{t.playgroundV2.guideMaxLengthTitle}</dt>
                   <dd className="leading-relaxed text-pretty">
-                    Longueur maximale de la réponse en tokens (≈ ¾ d&apos;un mot en français). Une
-                    valeur trop basse tronque la réponse.
+                    {t.playgroundV2.guideMaxLengthBody}
                   </dd>
                 </div>
                 <div>
-                  <dt className="mb-0.5 font-semibold text-ink">Reproductibilité</dt>
+                  <dt className="mb-0.5 font-semibold text-ink">{t.playgroundV2.guideReproducibilityTitle}</dt>
                   <dd className="leading-relaxed text-pretty">
-                    Deux appels identiques peuvent donner deux réponses différentes : l&apos;API
-                    Responses ne propose pas de graine aléatoire sur ce modèle.
+                    {t.playgroundV2.guideReproducibilityBody}
                   </dd>
                 </div>
               </dl>
             ) : (
               <p className="mt-3 text-[13px] leading-relaxed text-ink-muted text-pretty">
-                Deux appels identiques peuvent donner deux réponses différentes : l&apos;API ne
-                propose pas de graine aléatoire sur ce modèle.
+                {t.playgroundV2.guideCollapsedHint}
               </p>
             )}
           </Card>
@@ -326,9 +319,9 @@ export default function PlaygroundV2() {
 
           {history.length > 0 && (
             <div className="flex items-center justify-between px-1">
-              <Eyebrow>Historique de la session</Eyebrow>
+              <Eyebrow>{t.playgroundV2.historyTitle}</Eyebrow>
               <span className="text-[12.5px] text-ink-muted">
-                {totalRuns} génération{totalRuns > 1 ? 's' : ''} ·{' '}
+                {t.playgroundV2.generationsCount(totalRuns)} ·{' '}
                 <span className="font-mono tabular-nums text-ink">${totalCost.toFixed(6)}</span>
               </span>
             </div>
@@ -339,8 +332,8 @@ export default function PlaygroundV2() {
               <Spinner className="h-4 w-4 shrink-0 text-accent" />
               <span className="text-sm text-ink-muted">
                 {params.count > 1
-                  ? `${params.count} générations en cours…`
-                  : 'Génération en cours…'}
+                  ? t.playgroundV2.generatingCount(params.count)
+                  : t.playgroundV2.generating}
               </span>
             </Card>
           )}
@@ -373,16 +366,16 @@ export default function PlaygroundV2() {
                       <path d="M13 8a5 5 0 1 1-1.6-3.7" />
                       <path d="M13 2.5V5h-2.5" />
                     </svg>
-                    Relancer
+                    {t.playgroundV2.rerun}
                   </GhostButton>
                   <GhostButton
                     onClick={() => {
                       setPrompt(entry.prompt);
                       setParams({ ...entry.params });
                     }}
-                    title="Recharger ce prompt et ces réglages dans les contrôles"
+                    title={t.playgroundV2.resumeSettingsTitle}
                   >
-                    Reprendre ces réglages
+                    {t.playgroundV2.resumeSettings}
                   </GhostButton>
                 </div>
               </header>
@@ -403,11 +396,10 @@ export default function PlaygroundV2() {
                 <path d="M40 34.5h10M45 39.5V29.5" className="text-accent" stroke="currentColor" />
               </svg>
               <h3 className="mb-2.5 font-display text-[28px] font-normal text-ink">
-                Rien à comparer pour l&apos;instant
+                {t.playgroundV2.emptyStateTitle}
               </h3>
               <p className="mb-7 max-w-[46ch] text-[14.5px] leading-relaxed text-ink-muted text-pretty">
-                Lancez une première génération : chaque résultat s&apos;empile ici avec ses réglages,
-                sa latence et son coût, du plus récent au plus ancien.
+                {t.playgroundV2.emptyStateBody}
               </p>
               <div className="flex max-w-[560px] flex-wrap justify-center gap-2.5">
                 {QUICK_PROMPTS.slice(0, 3).map((quick) => (
@@ -425,8 +417,9 @@ export default function PlaygroundV2() {
                 ))}
               </div>
               <p className="mt-8 text-[12.5px] text-ink-subtle">
-                Astuce — passez à <strong className="font-semibold text-ink-muted">2 générations</strong>{' '}
-                avec la même température pour voir l&apos;ampleur de la variation.
+                {t.playgroundV2.emptyStateTipPrefix}{' '}
+                <strong className="font-semibold text-ink-muted">{t.playgroundV2.emptyStateTipStrong}</strong>{' '}
+                {t.playgroundV2.emptyStateTipSuffix}
               </p>
             </div>
           )}

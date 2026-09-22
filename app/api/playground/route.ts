@@ -1,5 +1,6 @@
 import { getOpenAIClient } from '@/lib/openai';
 import { checkRateLimit, clientIp } from '@/lib/rateLimit';
+import { serverErrors, parseLocaleFromBody } from '@/lib/i18n';
 
 export const maxDuration = 60;
 
@@ -12,24 +13,23 @@ const RATE_LIMIT = 30;
 const RATE_WINDOW_MS = 10 * 60 * 1000;
 
 export async function POST(request: Request) {
+  const body = await request.json().catch(() => ({}));
+  const errors = serverErrors[parseLocaleFromBody(body?.locale)];
+
   try {
     if (!checkRateLimit(`playground:${clientIp(request)}`, RATE_LIMIT, RATE_WINDOW_MS)) {
-      return Response.json(
-        { error: 'Trop de requêtes. Réessayez dans quelques minutes.' },
-        { status: 429 },
-      );
+      return Response.json({ error: errors.tooManyRequests }, { status: 429 });
     }
 
-    const body = await request.json();
     const prompt: string = body?.prompt?.trim();
 
     if (!prompt) {
-      return Response.json({ error: 'Le champ "prompt" est requis.' }, { status: 400 });
+      return Response.json({ error: errors.promptRequired }, { status: 400 });
     }
 
     if (prompt.length > MAX_PROMPT_LENGTH) {
       return Response.json(
-        { error: `Le champ "prompt" ne peut pas dépasser ${MAX_PROMPT_LENGTH} caractères.` },
+        { error: errors.promptTooLong(MAX_PROMPT_LENGTH) },
         { status: 400 },
       );
     }
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
 
     return Response.json({ text, usage, latency, cost });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Erreur inconnue';
+    const message = err instanceof Error ? err.message : errors.unknownError;
     return Response.json({ error: message }, { status: 500 });
   }
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { displayToken, formatPercentage } from '@/lib/utils';
+import { useT } from '../locale/useT';
 import type { TreeNode } from '@/lib/types';
 
 const LEAF_WIDTH = 80;
@@ -29,6 +30,7 @@ function NodeCard({
   isGreedy: boolean;
 }) {
   const s = RANK[rank];
+  const t = useT();
   return (
     <div className="flex flex-col items-center gap-0.5">
       <div
@@ -41,7 +43,7 @@ function NodeCard({
           minWidth: 40,
           boxShadow: isGreedy ? '0 1px 4px #378ADD30' : undefined,
         }}
-        title={`${node.phrase}\nCumulé: ${formatPercentage(node.cumulative)}`}
+        title={`${node.phrase}\n${t.probabilityTree.cumulative} ${formatPercentage(node.cumulative)}`}
       >
         {displayToken(node.token)}
       </div>

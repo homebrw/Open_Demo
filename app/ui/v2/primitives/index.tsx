@@ -1,5 +1,7 @@
 'use client';
 
+import { useT } from '../../../locale/useT';
+
 /** Small shared building blocks for the redesigned interface. */
 
 export function Card({
@@ -129,12 +131,13 @@ export function Spinner({ className = '' }: { className?: string }) {
 }
 
 export function ErrorBanner({ message }: { message: string }) {
+  const t = useT();
   return (
     <div
       role="alert"
       className="rounded-card border border-danger/25 bg-danger-soft px-5 py-4 text-sm text-danger"
     >
-      <strong className="font-semibold">Erreur — </strong>
+      <strong className="font-semibold">{t.primitives.errorPrefix}</strong>
       {message}
     </div>
   );
