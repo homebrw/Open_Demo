@@ -1,5 +1,6 @@
 import { getOpenAIClient } from '@/lib/openai';
 import { checkRateLimit, clientIp } from '@/lib/rateLimit';
+import { serverErrors, parseLocaleFromBody } from '@/lib/i18n';
 import type { TokenInfo, TreeNode } from '@/lib/types';
 
 export const maxDuration = 60;
@@ -66,24 +67,23 @@ async function buildTree(
 }
 
 export async function POST(request: Request) {
+  const body = await request.json().catch(() => ({}));
+  const errors = serverErrors[parseLocaleFromBody(body?.locale)];
+
   try {
     if (!checkRateLimit(`analyze:${clientIp(request)}`, RATE_LIMIT, RATE_WINDOW_MS)) {
-      return Response.json(
-        { error: 'Trop de requêtes. Réessayez dans quelques minutes.' },
-        { status: 429 },
-      );
+      return Response.json({ error: errors.tooManyRequests }, { status: 429 });
     }
 
-    const body = await request.json();
     const phrase: string = body?.phrase?.trim();
 
     if (!phrase) {
-      return Response.json({ error: 'Le champ "phrase" est requis.' }, { status: 400 });
+      return Response.json({ error: errors.phraseRequired }, { status: 400 });
     }
 
     if (phrase.length > MAX_PHRASE_LENGTH) {
       return Response.json(
-        { error: `Le champ "phrase" ne peut pas dépasser ${MAX_PHRASE_LENGTH} caractères.` },
+        { error: errors.phraseTooLong(MAX_PHRASE_LENGTH) },
         { status: 400 },
       );
     }
@@ -111,7 +111,7 @@ export async function POST(request: Request) {
 
     return Response.json({ topTokens: allRootTokens, tree });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Erreur inconnue';
+    const message = err instanceof Error ? err.message : errors.unknownError;
     return Response.json({ error: message }, { status: 500 });
   }
 }

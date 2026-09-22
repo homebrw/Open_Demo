@@ -2,14 +2,17 @@
 
 import type { TokenInfo } from '@/lib/types';
 import { displayToken, formatPercentage } from '@/lib/utils';
+import { useT } from '../../locale/useT';
 
 const ROW = 'grid grid-cols-[28px_minmax(0,148px)_minmax(0,1fr)_84px] items-center gap-x-4 sm:gap-x-5';
 
 export default function TokenBarsV2({ tokens }: { tokens: TokenInfo[] }) {
+  const t = useT();
+  const headers = [t.tokenBarsV2.index, t.tokenBarsV2.token, t.tokenBarsV2.probability, t.tokenBarsV2.logprob];
   return (
     <div>
       <div className={`${ROW} border-b border-line pb-2.5 pt-3.5`}>
-        {['#', 'Token', 'Probabilité', 'Log-prob'].map((label, i) => (
+        {headers.map((label, i) => (
           <div
             key={label}
             className={`text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-subtle ${

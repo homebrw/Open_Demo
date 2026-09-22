@@ -3,14 +3,17 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import VersionToggle from '../version/VersionToggle';
-
-const LINKS = [
-  { href: '/', label: '🧠 Explorateur de Logits' },
-  { href: '/playground', label: '🎛️ Playground' },
-];
+import LocaleToggle from '../locale/LocaleToggle';
+import { useT } from '../locale/useT';
 
 export default function Nav() {
   const pathname = usePathname();
+  const t = useT();
+
+  const LINKS = [
+    { href: '/', label: t.nav.explorer },
+    { href: '/playground', label: t.nav.playground },
+  ];
 
   return (
     <nav className="bg-white border-b border-gray-200 sticky top-0 z-10">
@@ -31,7 +34,10 @@ export default function Nav() {
             </Link>
           );
         })}
-        <VersionToggle variant="legacy" />
+        <div className="ml-auto flex items-center gap-4">
+          <LocaleToggle variant="legacy" />
+          <VersionToggle variant="legacy" />
+        </div>
       </div>
     </nav>
   );

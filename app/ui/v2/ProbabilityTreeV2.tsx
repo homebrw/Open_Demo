@@ -5,6 +5,7 @@ import type { TreeNode } from '@/lib/types';
 import { displayToken, formatPercentage } from '@/lib/utils';
 import { cumulativeAt, nodeAtPath, phraseAtPath, siblingsAt, type TreeCache } from './treeCascade';
 import { Eyebrow, GhostButton } from './primitives';
+import { useT } from '../../locale/useT';
 
 const NODE_W = 168;
 const NODE_H = 46;
@@ -37,6 +38,7 @@ export default function ProbabilityTreeV2({
   /** The greedy chain already guaranteed cached by the parent's prefetch. */
   initialPath: number[];
 }) {
+  const t = useT();
   const [path, setPath] = useState<number[]>(initialPath);
   const [renderedAnalysisId, setRenderedAnalysisId] = useState(analysisId);
   const [scale, setScale] = useState(1);
@@ -66,7 +68,7 @@ export default function ProbabilityTreeV2({
       try {
         await fetchLevel(phrase);
       } catch (err) {
-        setNodeErrors((m) => new Map(m).set(phrase, err instanceof Error ? err.message : 'Erreur inconnue'));
+        setNodeErrors((m) => new Map(m).set(phrase, err instanceof Error ? err.message : t.common.unknownError));
       } finally {
         setPendingPhrases((p) => {
           const next = new Set(p);
@@ -75,7 +77,7 @@ export default function ProbabilityTreeV2({
         });
       }
     },
-    [cache, fetchLevel, pendingPhrases],
+    [cache, fetchLevel, pendingPhrases, t],
   );
 
   const { columns, links, rootTop, width, height, pendingLevel, errorLevel } = useMemo(() => {
@@ -203,32 +205,32 @@ export default function ProbabilityTreeV2({
     <div>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-4 px-6 pt-6 sm:px-7">
         <div>
-          <h2 className="mb-1 text-base font-semibold text-ink">Arbre de probabilités</h2>
+          <h2 className="mb-1 text-base font-semibold text-ink">{t.probabilityTreeV2.title}</h2>
           <p className="text-[12.5px] text-ink-subtle">
-            Cliquez un token pour dérouler sa suite. L&apos;épaisseur du trait suit la probabilité.
+            {t.probabilityTreeV2.subtitle}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <GhostButton onClick={() => zoom(-0.1)} title="Dézoomer">
+          <GhostButton onClick={() => zoom(-0.1)} title={t.probabilityTreeV2.zoomOut}>
             <span aria-hidden>−</span>
-            <span className="sr-only">Dézoomer</span>
+            <span className="sr-only">{t.probabilityTreeV2.zoomOut}</span>
           </GhostButton>
           <span className="w-11 text-center font-mono text-[11.5px] tabular-nums text-ink-subtle">
             {Math.round(scale * 100)} %
           </span>
-          <GhostButton onClick={() => zoom(0.1)} title="Zoomer">
+          <GhostButton onClick={() => zoom(0.1)} title={t.probabilityTreeV2.zoomIn}>
             <span aria-hidden>+</span>
-            <span className="sr-only">Zoomer</span>
+            <span className="sr-only">{t.probabilityTreeV2.zoomIn}</span>
           </GhostButton>
-          <GhostButton onClick={() => setAutoFit(true)}>Ajuster</GhostButton>
-          <GhostButton onClick={() => setPath(initialPath)}>Chemin glouton</GhostButton>
+          <GhostButton onClick={() => setAutoFit(true)}>{t.probabilityTreeV2.fit}</GhostButton>
+          <GhostButton onClick={() => setPath(initialPath)}>{t.probabilityTreeV2.greedyPath}</GhostButton>
         </div>
       </div>
 
       <div ref={viewportRef} className="overflow-x-auto px-6 pb-6 sm:px-7">
         <div
           role="group"
-          aria-label="Arbre de probabilités des tokens — flèches pour naviguer"
+          aria-label={t.probabilityTreeV2.ariaLabel}
           tabIndex={0}
           onKeyDown={handleKeyDown}
           className="relative rounded-lg focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent"
@@ -259,7 +261,7 @@ export default function ProbabilityTreeV2({
             style={{ left: 0, top: rootTop, width: ROOT_W, height: NODE_H }}
           >
             <div className="truncate font-mono text-[13px] text-canvas">{initialPhrase}</div>
-            <div className="mt-0.5 text-[10.5px] text-canvas/60">phrase de départ</div>
+            <div className="mt-0.5 text-[10.5px] text-canvas/60">{t.probabilityTreeV2.startPhrase}</div>
           </div>
 
           {columns.map(({ level, nodes, selected: selectedRow }) => (
@@ -268,7 +270,7 @@ export default function ProbabilityTreeV2({
                 className="absolute text-[10.5px] font-semibold uppercase tracking-[0.09em] text-ink-subtle"
                 style={{ left: colX(level), top: 0, width: NODE_W }}
               >
-                Niveau {level + 1}
+                {t.probabilityTreeV2.level(level + 1)}
               </div>
               {nodes.map((node, row) => {
                 const onPath = row === selectedRow;
@@ -323,7 +325,7 @@ export default function ProbabilityTreeV2({
                 className="absolute text-[10.5px] font-semibold uppercase tracking-[0.09em] text-ink-subtle"
                 style={{ left: colX(pendingLevel), top: 0, width: NODE_W }}
               >
-                Niveau {pendingLevel + 1}
+                {t.probabilityTreeV2.level(pendingLevel + 1)}
               </div>
               {[0, 1, 2].map((row) => (
                 <div
@@ -343,9 +345,9 @@ export default function ProbabilityTreeV2({
               className="absolute rounded-field border border-danger/30 bg-danger-soft px-3 py-2.5 text-left text-[12px] leading-snug text-danger transition-colors hover:border-danger/50"
               style={{ left: colX(errorLevel), top: rowY(0), width: NODE_W }}
             >
-              Échec du chargement
+              {t.probabilityTreeV2.loadFailed}
               <br />
-              <span className="font-semibold">Réessayer</span>
+              <span className="font-semibold">{t.probabilityTreeV2.retry}</span>
             </button>
           )}
         </div>
@@ -354,9 +356,9 @@ export default function ProbabilityTreeV2({
       {selected && (
         <div className="border-t border-line bg-surface-sunken px-6 py-5 sm:px-7">
           <div className="mb-3.5 flex flex-wrap items-center gap-2">
-            <Eyebrow>Nœud sélectionné</Eyebrow>
+            <Eyebrow>{t.probabilityTreeV2.selectedNode}</Eyebrow>
             <span className="rounded-md border border-line bg-surface-alt px-2 py-0.5 font-mono text-[11.5px] text-ink-muted">
-              niveau {path.length}
+              {t.probabilityTreeV2.levelBadge(path.length)}
             </span>
           </div>
           <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_480px] lg:items-center">
@@ -367,7 +369,7 @@ export default function ProbabilityTreeV2({
             <dl className="grid grid-cols-2 gap-5 sm:grid-cols-4">
               <div>
                 <dt className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.07em] text-ink-subtle">
-                  Token
+                  {t.probabilityTreeV2.tokenLabel}
                 </dt>
                 <dd className="font-mono text-[15px] font-semibold tabular-nums">
                   {formatPercentage(selected.prob)}
@@ -375,7 +377,7 @@ export default function ProbabilityTreeV2({
               </div>
               <div>
                 <dt className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.07em] text-ink-subtle">
-                  Cumulé
+                  {t.probabilityTreeV2.cumulativeLabel}
                 </dt>
                 <dd className="font-mono text-[15px] font-semibold tabular-nums">
                   {formatPercentage(cumulativeAt(cache, initialPhrase, path))}
@@ -383,7 +385,7 @@ export default function ProbabilityTreeV2({
               </div>
               <div>
                 <dt className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.07em] text-ink-subtle">
-                  Log-prob
+                  {t.probabilityTreeV2.logprobLabel}
                 </dt>
                 <dd className="font-mono text-[15px] tabular-nums text-ink-muted">
                   {Math.log(selected.prob).toFixed(4)}
@@ -391,7 +393,7 @@ export default function ProbabilityTreeV2({
               </div>
               <div>
                 <dt className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.07em] text-ink-subtle">
-                  Candidats
+                  {t.probabilityTreeV2.candidatesLabel}
                 </dt>
                 <dd className="font-mono text-[15px] tabular-nums text-ink-muted">
                   {selectedCandidates ? selectedCandidates.length : '—'}

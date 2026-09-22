@@ -16,19 +16,17 @@ import {
   PrimaryButton,
   Spinner,
 } from './primitives';
+import { useT } from '../../locale/useT';
+import { useLocale } from '../../locale/LocaleProvider';
 
 const MODEL = 'gpt-3.5-turbo-instruct';
 const MAX_CHARS = 400;
 const DEPTH_OPTIONS = [2, 3, 4, 5] as const;
 
-const STARTERS = [
-  'La vie est',
-  'Il était une fois',
-  'La capitale de la France est',
-  '2 + 2 =',
-];
-
 export default function ExplorerV2() {
+  const t = useT();
+  const locale = useLocale();
+  const STARTERS = t.explorerV2.starters;
   const [phrase, setPhrase] = useState('');
   const [depth, setDepth] = useState(4);
   const [loading, setLoading] = useState(false);
@@ -53,15 +51,15 @@ export default function ExplorerV2() {
     const res = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phrase: phraseToFetch, depth: 1 }),
+      body: JSON.stringify({ phrase: phraseToFetch, depth: 1, locale }),
       signal,
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error ?? 'Erreur serveur');
+    if (!res.ok) throw new Error(data.error ?? t.common.unknownError);
 
     setCache((prev) => new Map(prev).set(phraseToFetch, data.tree));
     return data.tree;
-  }, []);
+  }, [locale, t]);
 
   async function handleAnalyze() {
     const trimmed = phrase.trim();
@@ -81,11 +79,11 @@ export default function ExplorerV2() {
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phrase: trimmed, depth: 1 }),
+        body: JSON.stringify({ phrase: trimmed, depth: 1, locale }),
         signal: controller.signal,
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Erreur serveur');
+      if (!res.ok) throw new Error(data.error ?? t.common.unknownError);
 
       setCache((prev) => new Map(prev).set(trimmed, data.tree));
 
@@ -108,7 +106,7 @@ export default function ExplorerV2() {
       setUsedPhrase(trimmed);
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return;
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      setError(err instanceof Error ? err.message : t.common.unknownError);
     } finally {
       abortRef.current = null;
       setLoading(false);
@@ -136,15 +134,15 @@ export default function ExplorerV2() {
   return (
     <main className="mx-auto w-full max-w-[1120px] px-6 py-10 sm:px-8 sm:py-11">
       <PageHeader
-        eyebrow="Explorateur"
+        eyebrow={t.explorerV2.eyebrow}
         title={
           <>
-            L&apos;arbre des possibles
+            {t.explorerV2.titleLine1}
             <br />
-            derrière chaque mot
+            {t.explorerV2.titleLine2}
           </>
         }
-        lede="Chaque token que le modèle produit est un choix parmi des milliers. Saisissez une phrase et remontez la distribution de probabilités, niveau par niveau."
+        lede={t.explorerV2.lede}
         model={MODEL}
       />
 
@@ -152,7 +150,7 @@ export default function ExplorerV2() {
       <Card className="mb-6">
         <div className="mb-3 flex items-center justify-between">
           <label htmlFor="phrase" className="text-[13px] font-semibold text-ink">
-            Phrase à compléter
+            {t.explorerV2.phraseLabel}
           </label>
           <span className="font-mono text-[11px] tabular-nums text-ink-subtle">
             {phrase.length} / {MAX_CHARS}
@@ -168,12 +166,12 @@ export default function ExplorerV2() {
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleAnalyze();
           }}
-          placeholder="Ex : La vie est"
+          placeholder={t.explorerV2.phrasePlaceholder}
           className="w-full resize-none rounded-field border border-line bg-surface px-4 py-3.5 font-mono text-[15px] leading-relaxed text-ink transition-shadow placeholder:text-ink-faint focus:border-accent-line focus:outline-none focus:ring-[3px] focus:ring-accent/10"
         />
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="mr-1 text-[12.5px] text-ink-subtle">Pour commencer</span>
+          <span className="mr-1 text-[12.5px] text-ink-subtle">{t.explorerV2.startersLabel}</span>
           {STARTERS.map((starter) => (
             <button
               key={starter}
@@ -189,7 +187,7 @@ export default function ExplorerV2() {
         <div className="mt-6 flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-end">
           <fieldset>
             <legend className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-ink-subtle">
-              Profondeur d&apos;exploration
+              {t.explorerV2.depthLegend}
             </legend>
             <div className="flex flex-wrap gap-2">
               {DEPTH_OPTIONS.map((d) => {
@@ -210,7 +208,7 @@ export default function ExplorerV2() {
                       {d}
                     </span>
                     <span className={`mt-px block text-[10.5px] ${active ? 'text-accent' : 'text-ink-subtle'}`}>
-                      {d} appels
+                      {t.explorerV2.depthCalls(d)}
                     </span>
                   </button>
                 );
@@ -220,7 +218,7 @@ export default function ExplorerV2() {
 
           <div className="flex items-center gap-4">
             {loading ? (
-              <GhostButton onClick={() => abortRef.current?.abort()}>Annuler</GhostButton>
+              <GhostButton onClick={() => abortRef.current?.abort()}>{t.explorerV2.cancel}</GhostButton>
             ) : (
               <span className="hidden items-center gap-1 sm:flex">
                 <Kbd>⌘</Kbd>
@@ -231,11 +229,11 @@ export default function ExplorerV2() {
               {loading ? (
                 <>
                   <Spinner className="h-4 w-4" />
-                  Construction…
+                  {t.explorerV2.building}
                 </>
               ) : (
                 <>
-                  Analyser
+                  {t.explorerV2.analyze}
                   <ArrowRight />
                 </>
               )}
@@ -244,7 +242,7 @@ export default function ExplorerV2() {
         </div>
 
         <p className="mt-4 border-t border-line-soft pt-3.5 text-[12.5px] text-ink-subtle">
-          {`${depth} appels pour ouvrir ${depth} niveaux · un appel de plus à chaque clic au-delà`}
+          {t.explorerV2.footnote(depth)}
         </p>
       </Card>
 
@@ -277,10 +275,10 @@ export default function ExplorerV2() {
         <div className="space-y-6">
           <Card>
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-base font-semibold text-ink">Chemin le plus probable</h2>
+              <h2 className="text-base font-semibold text-ink">{t.explorerV2.greedyPathTitle}</h2>
               <div className="flex items-center gap-3.5">
                 <span className="text-[12.5px] text-ink-muted">
-                  Probabilité cumulée{' '}
+                  {t.explorerV2.cumulativeProbability}{' '}
                   <span className="font-mono font-semibold tabular-nums text-ink">
                     {formatPercentage(greedy.cumulative)}
                   </span>
@@ -290,7 +288,7 @@ export default function ExplorerV2() {
                     <rect x="5.5" y="5.5" width="8" height="8" rx="1.5" />
                     <path d="M10.5 3.5H3.5a1 1 0 0 0-1 1v7" />
                   </svg>
-                  {copied ? 'Copié' : 'Copier'}
+                  {copied ? t.explorerV2.copied : t.explorerV2.copy}
                 </GhostButton>
               </div>
             </div>
@@ -302,9 +300,9 @@ export default function ExplorerV2() {
 
           <Card className="pb-4">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="text-base font-semibold text-ink">Tokens candidats — premier niveau</h2>
+              <h2 className="text-base font-semibold text-ink">{t.explorerV2.candidateTokensTitle}</h2>
               <p className="text-[12.5px] text-ink-subtle">
-                Les tokens les plus probables juste après{' '}
+                {t.explorerV2.candidateTokensSubtitle}{' '}
                 <span className="font-mono text-ink-muted">{usedPhrase}</span>
               </p>
             </div>
@@ -328,13 +326,7 @@ export default function ExplorerV2() {
         <div className="grid gap-5 sm:grid-cols-3">
           {[
             {
-              title: '1 · Le modèle découpe',
-              body: (
-                <>
-                  Votre phrase devient une suite de tokens — des fragments de mots, souvent précédés
-                  d&apos;une espace, notée <span className="font-mono text-ink">·</span>.
-                </>
-              ),
+              ...t.explorerV2.steps[0],
               icon: (
                 <>
                   <path d="M3 10h5M12 10h5" />
@@ -343,13 +335,11 @@ export default function ExplorerV2() {
               ),
             },
             {
-              title: '2 · Il note chaque suite',
-              body: 'Pour le token suivant, il attribue une probabilité à tout son vocabulaire. On affiche les premiers.',
+              ...t.explorerV2.steps[1],
               icon: <path d="M3.5 16V9M8.5 16V5M13.5 16v-4" />,
             },
             {
-              title: '3 · On recommence',
-              body: "Chaque candidat devient une nouvelle phrase à compléter. D'où l'arbre.",
+              ...t.explorerV2.steps[2],
               icon: (
                 <>
                   <circle cx="4" cy="10" r="1.6" />
@@ -367,7 +357,16 @@ export default function ExplorerV2() {
                 </svg>
               </div>
               <h3 className="mb-1.5 text-[15px] font-semibold text-ink">{step.title}</h3>
-              <p className="text-[13.5px] leading-relaxed text-ink-muted text-pretty">{step.body}</p>
+              <p className="text-[13.5px] leading-relaxed text-ink-muted text-pretty">
+                {'bodyPrefix' in step ? (
+                  <>
+                    {step.bodyPrefix} {step.bodySuffix} <span className="font-mono text-ink">·</span>
+                    {step.bodyEnd}
+                  </>
+                ) : (
+                  step.body
+                )}
+              </p>
             </div>
           ))}
         </div>

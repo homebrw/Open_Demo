@@ -3,11 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import VersionToggle from '../../version/VersionToggle';
-
-const LINKS = [
-  { href: '/', label: 'Explorateur' },
-  { href: '/playground', label: 'Playground' },
-];
+import LocaleToggle from '../../locale/LocaleToggle';
+import { useT } from '../../locale/useT';
 
 function Mark() {
   return (
@@ -23,6 +20,12 @@ function Mark() {
 
 export default function NavV2() {
   const pathname = usePathname();
+  const t = useT();
+
+  const LINKS = [
+    { href: '/', label: t.navV2.explorer },
+    { href: '/playground', label: t.navV2.playground },
+  ];
 
   return (
     <nav className="sticky top-0 z-20 border-b border-line bg-surface/90 backdrop-blur">
@@ -54,7 +57,10 @@ export default function NavV2() {
             })}
           </div>
         </div>
-        <VersionToggle variant="v2" />
+        <div className="flex items-center gap-4">
+          <LocaleToggle variant="v2" />
+          <VersionToggle variant="v2" />
+        </div>
       </div>
     </nav>
   );
