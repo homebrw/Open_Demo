@@ -2,6 +2,7 @@ import { getOpenAIClient } from '@/lib/openai';
 import { checkRateLimit, clientIp } from '@/lib/rateLimit';
 import { serverErrors, parseLocaleFromBody } from '@/lib/i18n';
 import type { TokenInfo, TreeNode } from '@/lib/types';
+import { ANALYZE_MODEL } from '@/lib/models';
 
 export const maxDuration = 60;
 
@@ -24,14 +25,28 @@ class Semaphore {
 async function getTopLogprobs(phrase: string, sem: Semaphore): Promise<TokenInfo[]> {
   await sem.acquire();
   try {
-    // Legacy completions API (gpt-3.5-turbo-instruct) gives true text-continuation logprobs
-    const response = await getOpenAIClient().completions.create({
-      model: 'gpt-3.5-turbo-instruct',
-      prompt: phrase,
-      max_tokens: 1,
-      logprobs: 5,
+    // gpt-3.5-turbo-instruct (legacy completions API) is deprecated: use Chat Completions
+    // with logprobs, prompting the model to continue the text verbatim.
+    const response = await getOpenAIClient().chat.completions.create({
+      model: ANALYZE_MODEL,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are a text-continuation engine. Continue the user text exactly where it stops, ' +
+            'as if you were completing the same sentence. Output only the continuation, with no ' +
+            'quotes, preamble or repetition of the input. Include a leading space if the next word needs one.',
+        },
+        { role: 'user', content: phrase },
+      ],
+      max_completion_tokens: 1,
+      temperature: 0,
+      logprobs: true,
+      top_logprobs: 5,
     });
-    const topLogprobs = response.choices[0]?.logprobs?.top_logprobs?.[0] ?? {};
+    const topLogprobs = Object.fromEntries(
+      (response.choices[0]?.logprobs?.content?.[0]?.top_logprobs ?? []).map(t => [t.token, t.logprob]),
+    );
     return Object.entries(topLogprobs)
       .map(([token, logprob]) => ({ token, prob: Math.exp(logprob), logprob }))
       .sort((a, b) => b.prob - a.prob);

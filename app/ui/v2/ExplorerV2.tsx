@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from 'react';
 import type { TokenInfo, TreeNode } from '@/lib/types';
 import { formatPercentage } from '@/lib/utils';
+import { ANALYZE_MODEL } from '@/lib/models';
 import { cumulativeAt, phraseAtPath, type TreeCache } from './treeCascade';
 import ProbabilityTreeV2 from './ProbabilityTreeV2';
 import TokenBarsV2 from './TokenBarsV2';
@@ -19,7 +20,7 @@ import {
 import { useT } from '../../locale/useT';
 import { useLocale } from '../../locale/LocaleProvider';
 
-const MODEL = 'gpt-3.5-turbo-instruct';
+const MODEL = ANALYZE_MODEL;
 const MAX_CHARS = 400;
 const DEPTH_OPTIONS = [2, 3, 4, 5] as const;
 
